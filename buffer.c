@@ -14,7 +14,13 @@ __buffer_t *alloc_new_buffer(const char *buffer) {
     }
     ++buffer_size;
     buf->bytes = malloc(sizeof(char) * (buffer_size));
-    memcpy(buf->bytes, buffer, buffer_size);
+
+    buf->start = buf->bytes;
+    buf->pos = buf->start;
+    buf->end = buf->bytes + buffer_size;
     buf->size = buffer_size;
+
+    memcpy(buf->bytes, buffer, buffer_size);
+
     return buf;
 }
