@@ -25,11 +25,19 @@ typedef struct {
 } __hash_t;
 
 typedef struct {
-    // todo: add http version and verb
-    // char *start;
-    __buffer_t *start;
-    int start_length;
-    __hash_t *meta[1024];
+    __buffer_t *verb;
+    __buffer_t *version;
+    __buffer_t *path;
+} http_request_header_start_t;
+
+#define HTTP_REQUEST_METHOD_GET 0x1
+#define HTTP_REQUEST_METHOD_PUT 0x2
+
+typedef struct {
+    __buffer_t  *start;
+    uint8_t      method;
+    int          start_length;
+    __hash_t    *meta[1024];
 } http_request_header_t;
 
 typedef struct {
@@ -44,9 +52,9 @@ typedef struct {
 
 static http_request_header_t *new_http_request_header(void);
 static http_request_header_t *set_http_request_header(http_request_header_t *header, const char *header_buf, const int header_size);
+static http_request_header_t *set_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length);
 static http_response_payload_t* new_http_response_payload(char *header, char *body);
 static http_request_payload_t* new_http_request_payload(const char *request_buf, const int request_size);
-static void set_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length);
 static __hash_t *parse_http_request_meta_header_line(const char *line_buf);
 static void prepare_http_header(size_t content_length, uv_buf_t *buf);
 
@@ -212,9 +220,54 @@ static __hash_t *parse_http_request_meta_header_line(const char *line_buf) {
     return hash;
 }
 
-static void set_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length) {
+#define str3_comp(str, c0, c1, c2, c3) *(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)
+
+static http_request_header_t
+*set_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length) {
     __buffer_t *buf = alloc_new_buffer(line_buf);
+
     header->start = buf;
+
+    enum {
+	start = 0,
+	method
+    } state;
+
+    state = start;
+
+    char *p, ch, *request_start;
+    for (p = buf->pos; p < buf->end; p++) {
+
+	ch = *p;
+
+	switch (state) {
+
+	case start:
+	    request_start = p;
+	    state = method;
+	    break;
+
+	case method:
+	    if (ch == ' ') {
+
+		switch(p - buf->start) {
+
+		case 3:
+		    if (str3_comp(request_start, 'G', 'E', 'T', ' ')) {
+			header->method = HTTP_REQUEST_METHOD_GET;
+			break;
+		    }
+
+		    if (str3_comp(request_start, 'P', 'U', 'T', ' ')) {
+			header->method = HTTP_REQUEST_METHOD_PUT;
+			break;
+		    }
+		}
+	    }
+	}
+    }
+
+    return header;
 }
 
 static http_request_header_t *new_http_request_header(void) {
@@ -223,7 +276,8 @@ static http_request_header_t *new_http_request_header(void) {
     return header;
 }
 
-static http_request_header_t *set_http_request_header(http_request_header_t *header, const char *header_buf, const int header_size) {
+static http_request_header_t
+*set_http_request_header(http_request_header_t *header, const char *header_buf, const int header_size) {
     enum {
 	start = 0,
 	almost_done,
@@ -296,11 +350,13 @@ static http_request_header_t *set_http_request_header(http_request_header_t *hea
 }
 
 static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_buf) {
-    http_request_payload_t *request_payload = new_http_request_payload(request_buf->base, request_buf->len);
-
     uv_buf_t *response_vec = new_http_iovec();
     prepare_http_header(make_file_buffer(&response_vec[1]), &response_vec[0]);
     http_response_payload_t *response_payload = new_http_response_payload(response_vec[0].base, response_vec[1].base);
+
+    http_request_payload_t *request_payload = new_http_request_payload(request_buf->base, request_buf->len);
+
+    printf("[debug] method: %i\n", request_payload->header->method);
 
     request_data_t *data_p = calloc(1, sizeof(request_data_t));
     request_data_t data = {
