@@ -30,8 +30,10 @@ typedef struct {
     __buffer_t *path;
 } http_request_header_start_t;
 
-#define HTTP_REQUEST_METHOD_GET 0x1
-#define HTTP_REQUEST_METHOD_PUT 0x2
+#define HTTP_REQUEST_METHOD_GET  0x1
+#define HTTP_REQUEST_METHOD_PUT  0x2
+#define HTTP_REQUEST_METHOD_POST 0x4
+#define HTTP_REQUEST_METHOD_HEAD 0x5
 
 typedef struct {
     __buffer_t  *start;
@@ -220,7 +222,7 @@ static __hash_t *parse_http_request_meta_header_line(const char *line_buf) {
     return hash;
 }
 
-#define str3_comp(str, c0, c1, c2, c3) *(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)
+#define str4_comp(str, c0, c1, c2, c3) *(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)
 
 static http_request_header_t
 *set_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length) {
@@ -253,13 +255,24 @@ static http_request_header_t
 		switch(p - buf->start) {
 
 		case 3:
-		    if (str3_comp(request_start, 'G', 'E', 'T', ' ')) {
+		    if (str4_comp(request_start, 'G', 'E', 'T', ' ')) {
 			header->method = HTTP_REQUEST_METHOD_GET;
 			break;
 		    }
 
-		    if (str3_comp(request_start, 'P', 'U', 'T', ' ')) {
+		    if (str4_comp(request_start, 'P', 'U', 'T', ' ')) {
 			header->method = HTTP_REQUEST_METHOD_PUT;
+			break;
+		    }
+
+		case 4:
+		    if (str4_comp(request_start, 'P', 'O', 'S', 'T')) {
+			header->method = HTTP_REQUEST_METHOD_POST;
+			break;
+		    }
+
+		    if (str4_comp(request_start, 'H', 'E', 'A', 'D')) {
+			header->method = HTTP_REQUEST_METHOD_POST;
 			break;
 		    }
 		}
