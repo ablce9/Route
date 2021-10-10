@@ -1,5 +1,7 @@
+#include <stdio.h>
+
 typedef struct {
-    int size;
+    size_t size;
     char *bytes;
     char *pos;
     char *start;
