@@ -15,6 +15,15 @@
 
 #define MAX_HTTP_HEADER_LINE_BUFFER_SIZE 4096
 
+#define HTTP_REQUEST_METHOD_GET  0x1
+#define HTTP_REQUEST_METHOD_PUT  0x2
+#define HTTP_REQUEST_METHOD_POST 0x4
+#define HTTP_REQUEST_METHOD_HEAD 0x5
+
+#define ROUTE_OK 0
+#define ROUTE_ERROR -1
+
+
 typedef struct {
     char *header;
     char *body;
@@ -24,11 +33,6 @@ typedef struct {
     char *key;
     void *value;
 } __hash_t;
-
-#define HTTP_REQUEST_METHOD_GET  0x1
-#define HTTP_REQUEST_METHOD_PUT  0x2
-#define HTTP_REQUEST_METHOD_POST 0x4
-#define HTTP_REQUEST_METHOD_HEAD 0x5
 
 typedef struct {
     __buffer_t  *start;
@@ -49,15 +53,13 @@ typedef struct {
 
 typedef intptr_t route_int;
 
-#define ROUTE_OK 0
-#define ROUTE_ERROR -1
-
 static http_request_header_t *new_http_request_header(void);
 static route_int parse_http_request_header(http_request_header_t *header, const __buffer_t *header_buf);
 static route_int parse_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length);
 static http_response_payload_t* new_http_response_payload(char *header, char *body);
 static http_request_payload_t* new_http_request_payload(void);
-static __hash_t *parse_http_request_meta_header_line(const char *line_buf);
+static __hash_t *new_hash(void);
+static __hash_t *parse_http_request_meta_header_line(__buffer_t *line_buf);
 static void prepare_http_header(size_t content_length, uv_buf_t *buf);
 
 
@@ -108,7 +110,7 @@ static void format_string(char *string, size_t size, char *fmt, ...)
 static char *build_http_header(size_t content_length) {
     char *fmt =								\
 	"HTTP/1.1 200 OK\n"						\
-	"Server: nginx\n" \
+	"Server: route\n" \
 	"Content-Length: %zu\n" \
 	"Date: Sun, 18 Apr 2021 04:13:15 GMT\n"				\
 	"Content-Type: text/html; charset=UTF-8\n"			\
@@ -158,7 +160,8 @@ static int make_file_buffer(uv_buf_t *file_buffer) {
 static void write_cb(uv_write_t *request, int status) {
     if (status < 0) {
 	fprintf(stderr, "write error %i\n", status);
-    };
+    }
+
     free(request);
 }
 
@@ -189,32 +192,46 @@ static http_request_payload_t *new_http_request_payload(void) {
     return request;
 }
 
-static __hash_t *parse_http_request_meta_header_line(const char *line_buf) {
+static __hash_t *new_hash(void) {
     __hash_t *hash = calloc(1, sizeof(__hash_t));
-    char ch, key_buf[2048], value_buf[2048];
-    int i = 0, key_len = 0, value_len = 0;
 
-    for (i = 0; i < strlen(line_buf); i++) {
-	ch = line_buf[i];
+    hash->key = NULL;
+    hash->value = NULL;
 
-	key_buf[i] = ch;
-	++key_len;
+    return hash;
+}
+
+static __hash_t *parse_http_request_meta_header_line(__buffer_t *line_buf) {
+    __hash_t *hash = new_hash();
+    char ch, value_buf[2048], *p;
+    int value_len = 0;
+
+    for (p = line_buf->pos; p < line_buf->end; p++) {
+
+	ch = *p;
+
 	if (ch == ':') {
-	    hash->key = malloc(sizeof(char)*i);
-	    key_buf[i] = '\0';
-	    memcpy(hash->key, key_buf, i);
+	    hash->key = malloc(sizeof(char)*(p-line_buf->start));
+	    memcpy(hash->key, line_buf->bytes, p-line_buf->start);
+	    break;
 	}
     }
 
-    for (i = key_len + 1; i < strlen(line_buf); i++) {
-	ch = line_buf[i];
+    ++p;
+    line_buf->pos += p-line_buf->start;
+
+    for (p = line_buf->pos; p < line_buf->end; p++) {
+
+	ch = *p;
+
 	if (ch != ' ') {
 	    value_buf[value_len] = ch;
 	    ++value_len;
+
 	}
     }
 
-    hash->value = malloc(sizeof(char)*value_len);
+    hash->value = malloc(sizeof(char)*(value_len));
     value_buf[value_len] = '\0';
     memcpy(hash->value, (void*)value_buf, value_len);
     return hash;
@@ -379,11 +396,12 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
     state = start;
     line_length = 0;
     int start_length = header->start->size + 1;
+    __buffer_t *line_buf;
 
     // Parse http meta headers
-    for (start_length = header->start_length + 1; start_length < header_buf->size; ++start_length) {
+    for (; start_length < header_buf->size; ++start_length) {
 
-	ch = header_buf->bytes[i];
+	ch = header_buf->bytes[start_length];
 
 	switch (ch) {
 
@@ -392,8 +410,10 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
 	    break;
 
 	case LF:
+	    /* TODO: skip last http header CRLF line */
 	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
-		hash = parse_http_request_meta_header_line(line);
+		line_buf = alloc_new_buffer(line);
+		hash = parse_http_request_meta_header_line(line_buf);
 		header->meta[hash_index] = hash;
 		++hash_index;
 	    };
