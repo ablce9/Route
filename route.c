@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdarg.h>
 
@@ -24,12 +25,6 @@ typedef struct {
     void *value;
 } __hash_t;
 
-typedef struct {
-    __buffer_t *verb;
-    __buffer_t *version;
-    __buffer_t *path;
-} http_request_header_start_t;
-
 #define HTTP_REQUEST_METHOD_GET  0x1
 #define HTTP_REQUEST_METHOD_PUT  0x2
 #define HTTP_REQUEST_METHOD_POST 0x4
@@ -52,11 +47,16 @@ typedef struct {
     http_request_payload_t *request;
 } request_data_t;
 
+typedef intptr_t route_int;
+
+#define ROUTE_OK 0
+#define ROUTE_ERROR -1
+
 static http_request_header_t *new_http_request_header(void);
-static http_request_header_t *set_http_request_header(http_request_header_t *header, const char *header_buf, const int header_size);
-static http_request_header_t *set_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length);
+static route_int parse_http_request_header(http_request_header_t *header, const __buffer_t *header_buf);
+static route_int parse_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length);
 static http_response_payload_t* new_http_response_payload(char *header, char *body);
-static http_request_payload_t* new_http_request_payload(const char *request_buf, const int request_size);
+static http_request_payload_t* new_http_request_payload(void);
 static __hash_t *parse_http_request_meta_header_line(const char *line_buf);
 static void prepare_http_header(size_t content_length, uv_buf_t *buf);
 
@@ -177,11 +177,9 @@ static http_response_payload_t *new_http_response_payload(char *header, char *bo
     return http_payload;
 }
 
-static http_request_payload_t *new_http_request_payload(const char *request_buf, const int request_size) {
+static http_request_payload_t *new_http_request_payload(void) {
     http_request_header_t *header = new_http_request_header();
     http_request_payload_t *request = calloc(1, sizeof(http_request_payload_t));
-
-    set_http_request_header(header, request_buf, request_size);
 
     http_request_payload_t req = {
 	.header = header
@@ -224,15 +222,16 @@ static __hash_t *parse_http_request_meta_header_line(const char *line_buf) {
 
 #define str4_comp(str, c0, c1, c2, c3) *(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)
 
-static http_request_header_t
-*set_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length) {
+static route_int
+parse_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length) {
     __buffer_t *buf = alloc_new_buffer(line_buf);
 
     header->start = buf;
 
     enum {
 	start = 0,
-	method
+	method,
+	http_path
     } state;
 
     state = start;
@@ -257,40 +256,70 @@ static http_request_header_t
 		case 3:
 		    if (str4_comp(request_start, 'G', 'E', 'T', ' ')) {
 			header->method = HTTP_REQUEST_METHOD_GET;
+			state = http_path;
 			break;
 		    }
 
 		    if (str4_comp(request_start, 'P', 'U', 'T', ' ')) {
 			header->method = HTTP_REQUEST_METHOD_PUT;
+			state = http_path;
 			break;
 		    }
+
+		    goto error;
 
 		case 4:
 		    if (str4_comp(request_start, 'P', 'O', 'S', 'T')) {
 			header->method = HTTP_REQUEST_METHOD_POST;
+			state = http_path;
 			break;
 		    }
 
 		    if (str4_comp(request_start, 'H', 'E', 'A', 'D')) {
 			header->method = HTTP_REQUEST_METHOD_POST;
+			state = http_path;
 			break;
 		    }
+
+		    goto error;
+
+		default:
+		    goto error;
+
 		}
 	    }
+
+	case http_path:
+	    break;
+
+	default:
+	    goto error;
+
 	}
     }
 
-    return header;
+    if (header->method == 0) {
+	goto error;
+    }
+
+    return ROUTE_OK;
+
+ error:
+    return ROUTE_ERROR;
 }
 
 static http_request_header_t *new_http_request_header(void) {
     http_request_header_t *header = calloc(1, sizeof(http_request_header_t));
 
+    header->start = NULL;
+    header->method = 0;
+    header->start_length = 0;
+
     return header;
 }
 
-static http_request_header_t
-*set_http_request_header(http_request_header_t *header, const char *header_buf, const int header_size) {
+static route_int
+parse_http_request_header(http_request_header_t *header, const __buffer_t *header_buf) {
     enum {
 	start = 0,
 	almost_done,
@@ -305,29 +334,45 @@ static http_request_header_t
 
     memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
 
-    // Parse http method and version
-    for (i = 0; i < header_size; ++i) {
+    route_int parsed_status;
 
-	ch = header_buf[i];
+    // Parse http method and version
+    for (i = 0; i < header_buf->size; ++i) {
+
+	ch = header_buf->bytes[i];
 
 	switch (ch) {
+
 	case CR:
 	    state = almost_done;
 	    break;
+
 	case LF:
 	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
 		line[line_length] = '\0';
-		set_http_request_header_start(header, line, line_length);
+		parsed_status = parse_http_request_header_start(header, line, line_length);
+
+		if (parsed_status != ROUTE_OK) {
+		    goto error;
+		}
+
 		state = done;
 		break;
 	    }
+
 	default:
 	    line[line_length] = ch;
 	    ++line_length;
+
 	}
+
 	if (state == done) {
 	    break;
-	};
+	}
+    }
+
+    if (!header->start) {
+	goto error;
     }
 
     memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE); // reset
@@ -336,30 +381,39 @@ static http_request_header_t
     int start_length = header->start->size + 1;
 
     // Parse http meta headers
-    for (start_length = header->start_length + 1; start_length < header_size; ++start_length) {
+    for (start_length = header->start_length + 1; start_length < header_buf->size; ++start_length) {
 
-	ch = header_buf[i];
+	ch = header_buf->bytes[i];
 
 	switch (ch) {
+
 	case CR:
 	    state = almost_done;
 	    break;
+
 	case LF:
 	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
 		hash = parse_http_request_meta_header_line(line);
 		header->meta[hash_index] = hash;
 		++hash_index;
 	    };
+
 	    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE); // reset
 	    line_length = 0;
 	    state = done;
 	    break;
+
 	default:
 	    line[line_length] = ch;
 	    ++line_length;
+
 	}
     }
-    return header;
+
+    return ROUTE_OK;
+
+ error:
+    return ROUTE_ERROR;
 }
 
 static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_buf) {
@@ -367,9 +421,16 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     prepare_http_header(make_file_buffer(&response_vec[1]), &response_vec[0]);
     http_response_payload_t *response_payload = new_http_response_payload(response_vec[0].base, response_vec[1].base);
 
-    http_request_payload_t *request_payload = new_http_request_payload(request_buf->base, request_buf->len);
+    http_request_payload_t *request_payload = new_http_request_payload();
+    __buffer_t http_request_header_buf = {
+	.size = request_buf->len,
+	.bytes = request_buf->base,
+    };
+    route_int parsed_status = parse_http_request_header(request_payload->header, &http_request_header_buf);
 
-    printf("[debug] method: %i\n", request_payload->header->method);
+    if (parsed_status != ROUTE_OK) {
+	goto error;
+    }
 
     request_data_t *data_p = calloc(1, sizeof(request_data_t));
     request_data_t data = {
@@ -382,6 +443,15 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     uv_write_t *writer = (uv_write_t*)malloc(sizeof(uv_write_t));
     uv_write(writer, handle, response_vec, 2, write_cb);
 
+    uv_close((uv_handle_t*)handle, close_cb);
+
+    free(request_buf->base);
+    free(response_vec);
+
+    return;
+
+ error:
+    printf("[debug] invalid requests. closing connection.\n");
     uv_close((uv_handle_t*)handle, close_cb);
 
     free(request_buf->base);
