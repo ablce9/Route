@@ -13,8 +13,8 @@ __buffer_t *alloc_new_buffer(const char *buffer) {
 	++buffer_size;
     }
     ++buffer_size;
-    buf->bytes = malloc(sizeof(char) * (buffer_size));
 
+    buf->bytes = calloc(buffer_size, sizeof(char));
     buf->start = buf->bytes;
     buf->pos = buf->start;
     buf->end = buf->bytes + buffer_size;
@@ -23,4 +23,15 @@ __buffer_t *alloc_new_buffer(const char *buffer) {
     memcpy(buf->bytes, buffer, buffer_size);
 
     return buf;
+}
+
+__buffer_t *copyn_buffer(const __buffer_t *src_buf, const size_t size) {
+    __buffer_t *dst_buf = calloc(1, sizeof(__buffer_t));
+
+    dst_buf->bytes = calloc(size, sizeof(char));
+    dst_buf->size = size;
+    memcpy(dst_buf->bytes, src_buf->bytes, size);
+    dst_buf->end = dst_buf->bytes + size;
+
+    return dst_buf;
 }

@@ -9,3 +9,4 @@ typedef struct {
 } __buffer_t;
 
 __buffer_t *alloc_new_buffer(const char *buffer);
+__buffer_t *copyn_buffer(const __buffer_t *src, const size_t size);
