@@ -30,8 +30,8 @@ typedef struct {
 } http_response_payload_t;
 
 typedef struct {
-    char *key;
-    void *value;
+    __buffer_t *key;
+    void       *value;
 } __hash_t;
 
 typedef struct {
@@ -59,7 +59,7 @@ static route_int parse_http_request_header_start(http_request_header_t *header, 
 static http_response_payload_t* new_http_response_payload(char *header, char *body);
 static http_request_payload_t* new_http_request_payload(void);
 static __hash_t *new_hash(void);
-static __hash_t *parse_http_request_meta_header_line(__buffer_t *line_buf);
+static __hash_t *parse_http_request_meta_header_line(const char *line_buf);
 static void prepare_http_header(size_t content_length, uv_buf_t *buf);
 
 
@@ -94,7 +94,7 @@ static void close_cb(uv_handle_t* handle) {
 }
 
 static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
-    buf->base = malloc(suggested_size);
+    buf->base = calloc(suggested_size, sizeof(char));
     buf->len = suggested_size;
 }
 
@@ -201,39 +201,42 @@ static __hash_t *new_hash(void) {
     return hash;
 }
 
-static __hash_t *parse_http_request_meta_header_line(__buffer_t *line_buf) {
+static __hash_t *parse_http_request_meta_header_line(const char *line_buf) {
+    __buffer_t *buf = alloc_new_buffer(line_buf);
     __hash_t *hash = new_hash();
     char ch, value_buf[2048], *p;
     int value_len = 0;
 
-    for (p = line_buf->pos; p < line_buf->end; p++) {
+    for (p = buf->pos; p < buf->end; p++) {
 
 	ch = *p;
 
 	if (ch == ':') {
-	    hash->key = malloc(sizeof(char)*(p-line_buf->start));
-	    memcpy(hash->key, line_buf->bytes, p-line_buf->start);
+	    hash->key = copyn_buffer(buf, p - buf->start);
 	    break;
 	}
     }
 
     ++p;
-    line_buf->pos += p-line_buf->start;
+    buf->pos += p - buf->start;
 
-    for (p = line_buf->pos; p < line_buf->end; p++) {
+    for (p = buf->pos; p < buf->end; p++) {
 
 	ch = *p;
 
 	if (ch != ' ') {
 	    value_buf[value_len] = ch;
 	    ++value_len;
-
 	}
     }
 
     hash->value = malloc(sizeof(char)*(value_len));
     value_buf[value_len] = '\0';
     memcpy(hash->value, (void*)value_buf, value_len);
+
+    free(buf->bytes);
+    free(buf);
+
     return hash;
 }
 
@@ -396,7 +399,6 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
     state = start;
     line_length = 0;
     int start_length = header->start->size + 1;
-    __buffer_t *line_buf;
 
     // Parse http meta headers
     for (; start_length < header_buf->size; ++start_length) {
@@ -412,8 +414,7 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
 	case LF:
 	    /* TODO: skip last http header CRLF line */
 	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
-		line_buf = alloc_new_buffer(line);
-		hash = parse_http_request_meta_header_line(line_buf);
+		hash = parse_http_request_meta_header_line(line);
 		header->meta[hash_index] = hash;
 		++hash_index;
 	    };
