@@ -5,11 +5,14 @@
 #include "./buffer.h"
 
 __buffer_t *alloc_new_buffer(const char *buffer) {
+    if (buffer[0] == '\0') {
+	return NULL;
+    }
+
     __buffer_t *buf = calloc(1, sizeof(__buffer_t));
     int buffer_size = 0;
-    char ch;
 
-    while ((ch = buffer[buffer_size])) {
+    while ((buffer[buffer_size])) {
 	++buffer_size;
     }
     ++buffer_size;
@@ -25,7 +28,7 @@ __buffer_t *alloc_new_buffer(const char *buffer) {
     return buf;
 }
 
-__buffer_t *copyn_buffer(const __buffer_t *src_buf, const size_t size) {
+__buffer_t *buffer_bytes_ncpy(const __buffer_t *src_buf, const size_t size) {
     __buffer_t *dst_buf = calloc(1, sizeof(__buffer_t));
 
     dst_buf->bytes = calloc(size, sizeof(char));
