@@ -72,11 +72,21 @@ static void close_cb(uv_handle_t* handle) {
 	request_data_t *data = handle->data;
 	http_response_payload_t *response = data->response;
 	http_request_payload_t *request = data->request;
+	__buffer_t *hash_value;
 
 	while ((hash = request->header->meta[i])) {
+
+	    // hash key
+	    free(hash->key->bytes);
 	    free(hash->key);
-	    free(hash->value);
+
+	    // hash value
+	    hash_value = (__buffer_t*)hash->value;
+	    free(hash_value->bytes);
+	    free(hash_value);
+
 	    free(hash);
+
 	    ++i;
 	}
 	free(request->header->start->bytes);
@@ -203,16 +213,19 @@ static __hash_t *new_hash(void) {
 
 static __hash_t *parse_http_request_meta_header_line(const char *line_buf) {
     __buffer_t *buf = alloc_new_buffer(line_buf);
+    if (buf == NULL) {
+	return NULL;
+    }
+
     __hash_t *hash = new_hash();
-    char ch, value_buf[2048], *p;
-    int value_len = 0;
+    char ch, *p;
 
     for (p = buf->pos; p < buf->end; p++) {
 
 	ch = *p;
 
 	if (ch == ':') {
-	    hash->key = copyn_buffer(buf, p - buf->start);
+	    hash->key = buffer_bytes_ncpy(buf, p - buf->start);
 	    break;
 	}
     }
@@ -224,15 +237,14 @@ static __hash_t *parse_http_request_meta_header_line(const char *line_buf) {
 
 	ch = *p;
 
-	if (ch != ' ') {
-	    value_buf[value_len] = ch;
-	    ++value_len;
+	if (ch == '\0') {
+	    __buffer_t *value_buf = alloc_new_buffer(buf->bytes + hash->key->size + 1 /* colon */ + 1 /* whitespace */);
+
+	    if (value_buf != NULL) {
+		hash->value = (void*)value_buf;
+	    }
 	}
     }
-
-    hash->value = malloc(sizeof(char)*(value_len));
-    value_buf[value_len] = '\0';
-    memcpy(hash->value, (void*)value_buf, value_len);
 
     free(buf->bytes);
     free(buf);
@@ -415,8 +427,11 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
 	    /* TODO: skip last http header CRLF line */
 	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
 		hash = parse_http_request_meta_header_line(line);
-		header->meta[hash_index] = hash;
-		++hash_index;
+
+		if (hash != NULL) {
+		    header->meta[hash_index] = hash;
+		    ++hash_index;
+		}
 	    };
 
 	    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE); // reset
