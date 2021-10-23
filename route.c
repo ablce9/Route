@@ -32,13 +32,13 @@ typedef struct {
 typedef struct {
     __buffer_t *key;
     void       *value;
-} __hash_t;
+} __map_t;
 
 typedef struct {
     __buffer_t  *start;
     uint8_t      method;
     int          start_length;
-    __hash_t    *meta[1024];
+    __map_t    *meta[1024];
 } http_request_header_t;
 
 typedef struct {
@@ -58,8 +58,8 @@ static route_int parse_http_request_header(http_request_header_t *header, const 
 static route_int parse_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length);
 static http_response_payload_t* new_http_response_payload(char *header, char *body);
 static http_request_payload_t* new_http_request_payload(void);
-static __hash_t *new_hash(void);
-static __hash_t *parse_http_request_meta_header_line(const char *line_buf);
+static __map_t *new_map(void);
+static __map_t *parse_http_request_meta_header_line(const char *line_buf);
 static void prepare_http_header(size_t content_length, uv_buf_t *buf);
 
 
@@ -67,25 +67,25 @@ static uv_loop_t *loop;
 
 static void close_cb(uv_handle_t* handle) {
     if (handle->data) {
-	__hash_t *hash;
+	__map_t *map;
 	int i = 0;
 	request_data_t *data = handle->data;
 	http_response_payload_t *response = data->response;
 	http_request_payload_t *request = data->request;
-	__buffer_t *hash_value;
+	__buffer_t *map_value;
 
-	while ((hash = request->header->meta[i])) {
+	while ((map = request->header->meta[i])) {
 
-	    // hash key
-	    free(hash->key->bytes);
-	    free(hash->key);
+	    // map key
+	    free(map->key->bytes);
+	    free(map->key);
 
-	    // hash value
-	    hash_value = (__buffer_t*)hash->value;
-	    free(hash_value->bytes);
-	    free(hash_value);
+	    // map value
+	    map_value = (__buffer_t*)map->value;
+	    free(map_value->bytes);
+	    free(map_value);
 
-	    free(hash);
+	    free(map);
 
 	    ++i;
 	}
@@ -202,22 +202,22 @@ static http_request_payload_t *new_http_request_payload(void) {
     return request;
 }
 
-static __hash_t *new_hash(void) {
-    __hash_t *hash = calloc(1, sizeof(__hash_t));
+static __map_t *new_map(void) {
+    __map_t *map = calloc(1, sizeof(__map_t));
 
-    hash->key = NULL;
-    hash->value = NULL;
+    map->key = NULL;
+    map->value = NULL;
 
-    return hash;
+    return map;
 }
 
-static __hash_t *parse_http_request_meta_header_line(const char *line_buf) {
+static __map_t *parse_http_request_meta_header_line(const char *line_buf) {
     __buffer_t *buf = alloc_new_buffer(line_buf);
     if (buf == NULL) {
 	return NULL;
     }
 
-    __hash_t *hash = new_hash();
+    __map_t *map = new_map();
     char ch, *p;
 
     for (p = buf->pos; p < buf->end; p++) {
@@ -225,7 +225,7 @@ static __hash_t *parse_http_request_meta_header_line(const char *line_buf) {
 	ch = *p;
 
 	if (ch == ':') {
-	    hash->key = buffer_bytes_ncpy(buf, p - buf->start);
+	    map->key = buffer_bytes_ncpy(buf, p - buf->start);
 	    break;
 	}
     }
@@ -238,10 +238,10 @@ static __hash_t *parse_http_request_meta_header_line(const char *line_buf) {
 	ch = *p;
 
 	if (ch == '\0') {
-	    __buffer_t *value_buf = alloc_new_buffer(buf->bytes + hash->key->size + 1 /* colon */ + 1 /* whitespace */);
+	    __buffer_t *value_buf = alloc_new_buffer(buf->bytes + map->key->size + 1 /* colon */ + 1 /* whitespace */);
 
 	    if (value_buf != NULL) {
-		hash->value = (void*)value_buf;
+		map->value = (void*)value_buf;
 	    }
 	}
     }
@@ -249,7 +249,7 @@ static __hash_t *parse_http_request_meta_header_line(const char *line_buf) {
     free(buf->bytes);
     free(buf);
 
-    return hash;
+    return map;
 }
 
 #define str4_comp(str, c0, c1, c2, c3) *(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)
@@ -359,8 +359,8 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
     } state;
 
     char line[MAX_HTTP_HEADER_LINE_BUFFER_SIZE], ch;
-    int i = 0, line_length = 0, hash_index = 0;
-    __hash_t *hash;
+    int i = 0, line_length = 0, map_index = 0;
+    __map_t *map;
 
     state = start;
 
@@ -426,11 +426,11 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
 	case LF:
 	    /* TODO: skip last http header CRLF line */
 	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
-		hash = parse_http_request_meta_header_line(line);
+		map = parse_http_request_meta_header_line(line);
 
-		if (hash != NULL) {
-		    header->meta[hash_index] = hash;
-		    ++hash_index;
+		if (map != NULL) {
+		    header->meta[map_index] = map;
+		    ++map_index;
 		}
 	    };
 
