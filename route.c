@@ -44,6 +44,7 @@ typedef struct {
 
 typedef struct {
     http_request_header_t *header;
+    size_t                size;
     // todo: add body
 } http_request_payload_t;
 
@@ -51,6 +52,12 @@ typedef struct {
     http_response_payload_t *response;
     http_request_payload_t *request;
 } request_data_t;
+
+typedef struct {
+    http_request_payload_t *client_request;
+    void                   *writer;
+    void                   *connection;
+} proxy_data_t;
 
 typedef intptr_t route_int;
 
@@ -65,6 +72,10 @@ static void prepare_http_header(size_t content_length, uv_buf_t *buf);
 
 
 static uv_loop_t *loop;
+
+static void close_error_connection_cb(uv_handle_t* handle) {
+    free(handle);
+}
 
 static void close_cb(uv_handle_t* handle) {
     if (handle->data) {
@@ -170,7 +181,7 @@ static int make_file_buffer(uv_buf_t *file_buffer) {
 
 static void write_cb(uv_write_t *request, int status) {
     if (status < 0) {
-	fprintf(stderr, "write error %i\n", status);
+	fprintf(stderr, "[error] write: %i\n", status);
     }
 
     free(request);
@@ -462,6 +473,84 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
     return ROUTE_ERROR;
 }
 
+static void close_proxy_connection_cb(uv_handle_t* handle) {
+    proxy_data_t *proxy = handle->data;
+    uv_close((uv_handle_t*)proxy->connection, close_cb);
+}
+
+static void proxy_response_writer_cb(uv_write_t *request, int status) {
+    if (status < 0) {
+	fprintf(stderr, "[error] write: %i\n", status);
+    }
+}
+
+static void proxy_read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_buf) {
+    proxy_data_t *proxy = handle->data;
+
+    if (nread < 0) {
+	uv_close((uv_handle_t*)handle, close_proxy_connection_cb);
+	return;
+    }
+
+    uv_write_t *writer = proxy->writer;
+
+    uv_write(writer, (uv_stream_t*)proxy->connection, request_buf, 1, proxy_response_writer_cb);
+}
+
+static __buffer_t *make_request_payload(const http_request_payload_t *payload) {
+    char buf[4049];
+    __buffer_t *header_buf;
+    char *format = "%s\n" CRLF;
+
+    memset(buf, 0, sizeof(buf));
+    format_string(buf, sizeof(buf), format, payload->header->start->bytes);
+    header_buf = alloc_new_buffer(buf);
+
+    return header_buf;
+}
+
+static void on_connect(uv_connect_t *connection, int status) {
+    if (status < 0) {
+	printf("connection error: %s\n", uv_strerror(status));
+    }
+
+    proxy_data_t *proxy = (proxy_data_t*)connection->data;
+    __buffer_t *request_buf = make_request_payload(proxy->client_request);
+    connection->handle->data = (void*)proxy;
+
+    const uv_buf_t request_vec[] = {
+	{ .base = request_buf->bytes, .len = request_buf->size }
+    };
+
+    uv_write_t *writer = (uv_write_t*)malloc(sizeof(uv_write_t));
+    uv_write(writer, connection->handle, request_vec, 1, write_cb);
+    int ret = uv_read_start((uv_stream_t*)connection->handle, alloc_buffer, proxy_read_cb);
+    if (ret < 0) {
+	printf("[error] proxy read %s\n", uv_strerror(ret));
+    }
+}
+
+typedef struct {
+    char      *address;
+    uint16_t  port;
+} proxy_dest_address_t;
+
+static void proxy_request(proxy_data_t *proxy) {
+    uv_tcp_t* socket = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
+    uv_tcp_init(loop, socket);
+
+    uv_connect_t* connection = (uv_connect_t*)malloc(sizeof(uv_connect_t));
+    proxy_dest_address_t dest_addr = {
+	.address = "127.0.0.1",
+	.port = 8000
+    };
+    struct sockaddr_in dest;
+    uv_ip4_addr(dest_addr.address, dest_addr.port, &dest);
+    connection->data = (void*)proxy;
+
+    uv_tcp_connect(connection, socket, (const struct sockaddr*)&dest, on_connect);
+}
+
 static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_buf) {
     uv_buf_t *response_vec = new_http_iovec();
     prepare_http_header(make_file_buffer(&response_vec[1]), &response_vec[0]);
@@ -487,9 +576,17 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     handle->data = (void*)data_p;
 
     uv_write_t *writer = (uv_write_t*)malloc(sizeof(uv_write_t));
-    uv_write(writer, handle, response_vec, 2, write_cb);
+    proxy_data_t *proxy = (proxy_data_t*)malloc(sizeof(proxy_data_t));
 
-    uv_close((uv_handle_t*)handle, close_cb);
+    proxy->client_request = request_payload;
+    proxy->writer = (void*)writer;
+    proxy->connection = (void*)handle;
+    proxy_request(proxy);
+
+    // uv_write_t *writer = (uv_write_t*)malloc(sizeof(uv_write_t));
+    // uv_write(writer, handle, response_vec, 2, write_cb);
+
+    // uv_close((uv_handle_t*)handle, close_cb);
 
     free(request_buf->base);
     free(response_vec);
@@ -498,7 +595,7 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
 
  error:
     printf("[debug] invalid requests. closing connection.\n");
-    uv_close((uv_handle_t*)handle, close_cb);
+    uv_close((uv_handle_t*)handle, close_error_connection_cb);
 
     free(request_buf->base);
     free(response_vec);
