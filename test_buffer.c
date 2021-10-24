@@ -7,8 +7,7 @@
 #include "./buffer.h"
 
 #define str5comp(str, c0, c1, c2, c3, c4) \
-    *(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0) \
-	&& (str[4] == c4)
+    (*(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0) && (str[4] == c4))
 
 int main() {
     const char input_buffer[] = {'i', 'n', 'p', 'u', 't', '\0'};
@@ -17,14 +16,12 @@ int main() {
     buf = alloc_new_buffer(input_buffer);
     assert(buf->size == strlen(input_buffer) + 1);
     assert(str5comp(buf->bytes, 'i', 'n', 'p', 'u', 't') == 1);
-    // TODO: fix me. doesn't pass...
-    //assert(str5comp(buf->bytes, 'k', 'n', 'p', 'u', 't') == 0);
+    assert(str5comp(buf->bytes, 'k', 'n', 'p', 'u', 't') == 0);
 
     dest_buf = buffer_bytes_ncpy(buf, 5);
     assert(dest_buf->size == 5);
     assert(str5comp(dest_buf->bytes, 'i', 'n', 'p', 'u', 't') == 1);
-    /*     TODO: fix me. doesn't pass... */
-    /* assert(str5comp(dest_buf->bytes, 'i', 'm', 'p', 'u', 't') == 0); */
+    assert(str5comp(dest_buf->bytes, 'i', 'm', 'p', 'u', 't') == 0);
 
     free(buf->bytes);
     free(buf);
