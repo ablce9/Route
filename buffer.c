@@ -12,7 +12,7 @@ __buffer_t *alloc_new_buffer(const char *buffer) {
     __buffer_t *buf = calloc(1, sizeof(__buffer_t));
     int buffer_size = 0;
 
-    while ((buffer[buffer_size])) {
+    while ((buffer[buffer_size] != '\0')) {
 	++buffer_size;
     }
     ++buffer_size;
