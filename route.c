@@ -252,7 +252,7 @@ static __map_t *parse_http_request_meta_header_line(const char *line_buf) {
     return map;
 }
 
-#define str4_comp(str, c0, c1, c2, c3) *(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)
+#define str4comp(str, c0, c1, c2, c3) *(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)
 
 static route_int
 parse_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length) {
@@ -286,13 +286,13 @@ parse_http_request_header_start(http_request_header_t *header, const char *line_
 		switch(p - buf->start) {
 
 		case 3:
-		    if (str4_comp(request_start, 'G', 'E', 'T', ' ')) {
+		    if (str4comp(request_start, 'G', 'E', 'T', ' ')) {
 			header->method = HTTP_REQUEST_METHOD_GET;
 			state = http_path;
 			break;
 		    }
 
-		    if (str4_comp(request_start, 'P', 'U', 'T', ' ')) {
+		    if (str4comp(request_start, 'P', 'U', 'T', ' ')) {
 			header->method = HTTP_REQUEST_METHOD_PUT;
 			state = http_path;
 			break;
@@ -301,13 +301,13 @@ parse_http_request_header_start(http_request_header_t *header, const char *line_
 		    goto error;
 
 		case 4:
-		    if (str4_comp(request_start, 'P', 'O', 'S', 'T')) {
+		    if (str4comp(request_start, 'P', 'O', 'S', 'T')) {
 			header->method = HTTP_REQUEST_METHOD_POST;
 			state = http_path;
 			break;
 		    }
 
-		    if (str4_comp(request_start, 'H', 'E', 'A', 'D')) {
+		    if (str4comp(request_start, 'H', 'E', 'A', 'D')) {
 			header->method = HTTP_REQUEST_METHOD_POST;
 			state = http_path;
 			break;
