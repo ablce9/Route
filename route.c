@@ -19,6 +19,7 @@
 #define HTTP_REQUEST_METHOD_PUT  0x2
 #define HTTP_REQUEST_METHOD_POST 0x4
 #define HTTP_REQUEST_METHOD_HEAD 0x5
+#define HTTP_REQUEST_METHOD_PATCH 0x6
 
 #define ROUTE_OK 0
 #define ROUTE_ERROR -1
@@ -253,6 +254,8 @@ static __map_t *parse_http_request_meta_header_line(const char *line_buf) {
 }
 
 #define str4comp(str, c0, c1, c2, c3) *(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)
+#define str5comp(str, c0, c1, c2, c3, c4) \
+    (*(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0) && (str[4] == c4))
 
 static route_int
 parse_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length) {
@@ -314,6 +317,13 @@ parse_http_request_header_start(http_request_header_t *header, const char *line_
 		    }
 
 		    goto error;
+
+		case 5:
+		    if (str5comp(request_start, 'P', 'A', 'T', 'C', 'H')) {
+			header->method = HTTP_REQUEST_METHOD_PATCH;
+			state = http_path;
+			break;
+		    }
 
 		default:
 		    goto error;
