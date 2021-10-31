@@ -146,20 +146,17 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
 	done
     } state;
 
-    char line[MAX_HTTP_HEADER_LINE_BUFFER_SIZE], ch;
-    int i = 0, line_length = 0, map_index = 0;
+    char line[MAX_HTTP_HEADER_LINE_BUFFER_SIZE], ch, *p;
+    int line_length = 0, map_index = 0;
     __map_t *map;
-
-    state = start;
-
-    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
-
     route_int parsed_status;
 
-    // Parse http method and version
-    for (i = 0; i < header_buf->size; ++i) {
+    state = start;
+    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
 
-	ch = header_buf->bytes[i];
+    for (p = header_buf->pos; p < header_buf->end; p++) {
+
+	ch = *p;
 
 	switch (ch) {
 
@@ -198,12 +195,10 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
     memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE); // reset
     state = start;
     line_length = 0;
-    int start_length = header->start->size + 1;
 
-    // Parse http meta headers
-    for (; start_length < header_buf->size; ++start_length) {
+    for (p = header_buf->pos + header->start->size; p < header_buf->end; ++p) {
 
-	ch = header_buf->bytes[start_length];
+	ch = *p;
 
 	switch (ch) {
 
@@ -212,7 +207,6 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
 	    break;
 
 	case LF:
-	    /* TODO: skip last http header CRLF line */
 	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
 		map = parse_http_request_meta_header_line(line);
 
