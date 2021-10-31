@@ -40,7 +40,7 @@ http_request_payload_t *new_http_request_payload(void) {
 }
 
 route_int
-parse_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length) {
+parse_http_request_header_start(http_request_header_t *header, const char *line_buf) {
     __buffer_t *buf = alloc_new_buffer(line_buf);
 
     header->start = buf;
@@ -170,15 +170,15 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
 	case LF:
 	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
 		line[line_length] = '\0';
-		parsed_status = parse_http_request_header_start(header, line, line_length);
+		parsed_status = parse_http_request_header_start(header, line);
 
 		if (parsed_status != ROUTE_OK) {
 		    goto error;
 		}
 
 		state = done;
-		break;
 	    }
+	    break;
 
 	default:
 	    line[line_length] = ch;

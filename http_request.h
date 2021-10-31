@@ -41,7 +41,7 @@ typedef struct {
     // todo: add body
 } http_request_payload_t;
 
-route_int parse_http_request_header_start(http_request_header_t *header, const char *line_buf, const int line_length);
+route_int parse_http_request_header_start(http_request_header_t *header, const char *line_buf);
 route_int parse_http_request_header(http_request_header_t *header, const __buffer_t *header_buf);
 __map_t *parse_http_request_meta_header_line(const char *line_buf);
 http_request_header_t *new_http_request_header(void);
