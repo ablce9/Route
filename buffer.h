@@ -1,3 +1,6 @@
+#ifndef __BUFFER_H
+#define __BUFFER_H
+
 #include <stdio.h>
 
 typedef struct {
@@ -10,3 +13,5 @@ typedef struct {
 
 __buffer_t *alloc_new_buffer(const char *buffer);
 __buffer_t *buffer_bytes_ncpy(const __buffer_t *src, const size_t size);
+
+#endif // __BUFFER_H
