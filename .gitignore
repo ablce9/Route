@@ -1,3 +1,5 @@
 *.o
 *.so
 route
+test_buffer
+test_http

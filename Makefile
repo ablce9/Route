@@ -6,8 +6,12 @@ all: route
 route: $(OBJS)
 	$(CC) -o $@ $(OBJS) $(CFLAGS)
 
-test: $(TEST_OBJS)
+test_buffer: $(TEST_OBJS)
 	$(CC) -o $@ $(TEST_OBJS) $(CFLAGS)
+	./test_buffer
+
+test_http: test_http.o $(OBJS)
+	$(CC) -o $@ http.o buffer.o map.o test_http.o $(CFLAGS)
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) $< -o $@
