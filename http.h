@@ -1,5 +1,5 @@
-#ifndef __HTTP_REQUEST_H
-#define __HTTP_REQUEST_H
+#ifndef __HTTP_H
+#define __HTTP_H
 
 #include <stdint.h>
 #include <string.h>
@@ -48,4 +48,4 @@ http_request_header_t *new_http_request_header(void);
 http_response_payload_t* new_http_response_payload(char *header, char *body);
 http_request_payload_t *new_http_request_payload(void);
 
-#endif //  __HTTP_REQUEST_H
+#endif //  __HTTP_H

@@ -1,4 +1,4 @@
-OBJS := buffer.o map.o http_request.o route.o
+OBJS := buffer.o map.o http.o route.o
 TEST_OBJS := buffer.o test_buffer.o
 CFLAGS := -luv -Wall -g -ggdb -O0
 all: route

@@ -8,7 +8,7 @@
 
 #include "./buffer.h"
 #include "./map.h"
-#include "./http_request.h"
+#include "./http.h"
 
 #define CRLF "\r\n"
 
