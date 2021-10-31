@@ -9,7 +9,7 @@
 #define str5comp(str, c0, c1, c2, c3, c4) \
     (*(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0) && (str[4] == c4))
 
-int main() {
+int test_buffer() {
     const char input_buffer[] = {'i', 'n', 'p', 'u', 't', '\0'};
 
     __buffer_t *buf, *dest_buf;
@@ -30,4 +30,8 @@ int main() {
 
     printf("[info] test_buffer.c finished as expected!\n");
     exit(0);
+}
+
+int main() {
+    exit(test_buffer());
 }
