@@ -142,12 +142,9 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     http_response_payload_t *response_payload = new_http_response_payload(response_vec[0].base, response_vec[1].base);
 
     http_request_payload_t *request_payload = new_http_request_payload();
-    __buffer_t http_request_header_buf = {
-	.size = request_buf->len,
-	.bytes = request_buf->base,
-    };
-    route_int parsed_status = parse_http_request_header(request_payload->header, &http_request_header_buf);
+    __buffer_t *http_request_header_buf = alloc_new_buffer(request_buf->base);
 
+    route_int parsed_status = parse_http_request_header(request_payload->header, http_request_header_buf);
     if (parsed_status != ROUTE_OK) {
 	goto error;
     }
@@ -165,6 +162,9 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
 
     uv_close((uv_handle_t*)handle, close_cb);
 
+    free(http_request_header_buf->bytes);
+    free(http_request_header_buf);
+
     free(request_buf->base);
     free(response_vec);
 
@@ -172,6 +172,7 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
 
  error:
     printf("[debug] invalid requests. closing connection.\n");
+    // TODO: add a dedicated error closer
     uv_close((uv_handle_t*)handle, close_cb);
 
     free(request_buf->base);
