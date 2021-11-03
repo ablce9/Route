@@ -136,7 +136,16 @@ static uv_buf_t* new_http_iovec() {
     return iovec;
 }
 
+static void invalid_request_close_cb(uv_handle_t* handle) {
+    free(handle);
+}
+
 static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_buf) {
+    if (nread <= 0) {
+	uv_close((uv_handle_t*)handle, invalid_request_close_cb);
+	return;
+    }
+
     uv_buf_t *response_vec = new_http_iovec();
     prepare_http_header(make_file_buffer(&response_vec[1]), &response_vec[0]);
     http_response_payload_t *response_payload = new_http_response_payload(response_vec[0].base, response_vec[1].base);
@@ -172,8 +181,7 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
 
  error:
     printf("[debug] invalid requests. closing connection.\n");
-    // TODO: add a dedicated error closer
-    uv_close((uv_handle_t*)handle, close_cb);
+    uv_close((uv_handle_t*)handle, invalid_request_close_cb);
 
     free(request_buf->base);
     free(response_vec);
