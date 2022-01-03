@@ -3,14 +3,16 @@
 
 region_t *create_region() {
     region_t *r;
+    size_t max_regions_size;
 
     r = malloc(sizeof(region_t));
     if (r == NULL) {
 	return NULL;
     }
 
-#define MAX_REGIONS_SIZE 16 * 1024
-    r->max = MAX_REGIONS_SIZE;
+    max_regions_size = 16 * 1024;
+    r->max = max_regions_size;
+
     r->current = r;
     r->next = NULL;
 
