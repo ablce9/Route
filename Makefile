@@ -10,7 +10,7 @@ test_buffer: test_buffer.o $(TEST_OBJS)
 	$(CC) -o $@ test_buffer.o $(TEST_OBJS) $(CFLAGS)
 
 test_http: test_http.o
-	$(CC) -o $@ http.o buffer.o map.o test_http.o $(CFLAGS)
+	$(CC) -o $@ http.o buffer.o map.o region.o test_http.o $(CFLAGS)
 
 test_region: test_region.o $(OBJS)
 	$(CC) -o $@ $(TEST_OBJS) test_region.o $(CFLAGS)
