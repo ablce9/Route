@@ -1,11 +1,37 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "./http.h"
 #include "./buffer.h"
 #include "./map.h"
 
+#define CRLF "\r\n"
+
+static void format_string(char *string, size_t size, char *fmt, ...);
+
+char *make_http_response_header(size_t size, __buffer_t *chain_buf) {
+    char *fmt =								\
+	"HTTP/1.1 200 OK\n"						\
+	"Server: route\n" \
+	"Content-Length: %zu\n" \
+	"Date: Sun, 18 Apr 2021 04:13:15 GMT\n"				\
+	"Content-Type: text/html; charset=UTF-8\n"			\
+	CRLF;
+    char buf[4049];
+    char *header;
+    size_t buf_size = sizeof(buf);
+
+    memset(buf, 0, buf_size);
+    format_string(buf, buf_size, fmt, size);
+
+    header = chain_buf->pos;
+    memcpy(header, buf, buf_size);
+    chain_buf->pos += buf_size;
+
+    return header;
+}
 
 http_request_header_t *new_http_request_header(void) {
     http_request_header_t *header = calloc(1, sizeof(http_request_header_t));
@@ -273,4 +299,13 @@ __map_t *parse_http_request_meta_header_line(const char *line_buf) {
     free(buf);
 
     return map;
+}
+
+static void format_string(char *string, size_t size, char *fmt, ...)
+{
+   va_list arg_ptr;
+
+   va_start(arg_ptr, fmt);
+   vsnprintf(string, size, fmt, arg_ptr);
+   va_end(arg_ptr);
 }

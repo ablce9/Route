@@ -24,9 +24,33 @@ static int test_parse_http_request_header() {
     assert(strncmp(request_header->meta[1]->key->bytes, (char*)"User-Agent: curl/7.74.0", 10) == 0);
     assert(strncmp(request_header->meta[2]->key->bytes, (char*)"Accept", 6) == 0);
     printf("[info] test_http.c finished as expected!\n");
-    exit(0);
+
+    return 0;
+}
+
+static int test_make_http_header() {
+    __buffer_t *buf;
+    region_t *r;
+    char *header1, *header2, *header3;
+
+    r = create_region();
+
+    buf = create_chain_buffer(r, sizeof(char *) * 4049 * 3);
+
+    header1 = make_http_response_header(1, buf);
+    header2 = make_http_response_header(2, buf);
+    header3 = make_http_response_header(3, buf);
+
+    printf("%s %s %s", header1, header2, header3);
+
+    destroy_regions(r);
+    free(buf);
+    return 0;
 }
 
 int main() {
-    exit(test_parse_http_request_header());
+    /* todo: free memory */
+    /* test_parse_http_request_header(); */
+    test_make_http_header();
+    return 0;
 }

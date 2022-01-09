@@ -47,5 +47,6 @@ __map_t *parse_http_request_meta_header_line(const char *line_buf);
 http_request_header_t *new_http_request_header(void);
 http_response_payload_t* new_http_response_payload(char *header, char *body);
 http_request_payload_t *new_http_request_payload(void);
+char *make_http_response_header(size_t size, __buffer_t *chain_buf);
 
 #endif //  __HTTP_H
