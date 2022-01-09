@@ -4,7 +4,8 @@
 #include <assert.h>
 #include <stdint.h>
 
-#include "./buffer.h"
+#include "buffer.h"
+#include "region.h"
 
 #define str5comp(str, c0, c1, c2, c3, c4) \
     (*(uint32_t *) str == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0) && (str[4] == c4))
@@ -29,9 +30,34 @@ int test_buffer() {
     free(dest_buf);
 
     printf("[info] test_buffer.c finished as expected!\n");
-    exit(0);
+
+    return 0;
+}
+
+int test_create_chain_buffer() {
+    __buffer_t *buf;
+    region_t *r;
+    char *a, *b;
+
+    r = create_region();
+    buf = create_chain_buffer(r, sizeof(char *) * 10);
+
+    a = buf->pos;
+    a = "a";
+    buf->pos += 1;
+
+    b = buf->pos;
+    b = "b";
+    buf->pos += 2;
+
+    printf("%s, %s\n", a, b);
+
+    destroy_regions(r);
+    free(buf);
+    return 0;
 }
 
 int main() {
-    exit(test_buffer());
+    // test_buffer();
+    exit(test_create_chain_buffer());
 }
