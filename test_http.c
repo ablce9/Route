@@ -10,7 +10,7 @@
 #define CRLF "\r\n"
 
 static int test_parse_http_request_header() {
-    http_request_header_t *request_header = calloc(1, sizeof(http_request_header_t));
+    http_header_t *request_header = calloc(1, sizeof(http_header_t));
     char *raw_header = "GET / HTTP/1.1" CRLF \
 	"Host: google.com" CRLF \
 	"User-Agent: curl/7.74.0" CRLF \
@@ -32,16 +32,22 @@ static int test_make_http_header() {
     __buffer_t *buf;
     region_t *r;
     char *header1, *header2, *header3;
+    http_header_t h;
 
     r = create_region();
 
-    buf = create_chain_buffer(r, sizeof(char *) * 4049 * 3);
+    buf = create_chain_buffer(r, sizeof(char *) * 5000 * 3);
 
-    header1 = make_http_response_header(1, buf);
-    header2 = make_http_response_header(2, buf);
-    header3 = make_http_response_header(3, buf);
+    h.size = 1;
+    header1 = make_http_response_header(&h, buf);
 
-    printf("%s %s %s", header1, header2, header3);
+    h.size = 2;
+    header2 = make_http_response_header(&h, buf);
+
+    h.size = 3;
+    header3 = make_http_response_header(&h, buf);
+
+    printf("%s%s%s", header1, header2, header3);
 
     destroy_regions(r);
     free(buf);
@@ -52,5 +58,13 @@ int main() {
     /* todo: free memory */
     /* test_parse_http_request_header(); */
     test_make_http_header();
+
+    time_t t;
+
+    t = time(&t);
+    char http_time[1024];
+    memset(http_time, 0, sizeof(http_time));
+    make_http_time(&t, http_time);
+    printf("%s\n", http_time);
     return 0;
 }

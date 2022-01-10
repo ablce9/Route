@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdarg.h>
+#include <time.h>
 
 #include "./http.h"
 #include "./buffer.h"
@@ -11,20 +12,44 @@
 
 static void format_string(char *string, size_t size, char *fmt, ...);
 
-char *make_http_response_header(size_t size, __buffer_t *chain_buf) {
+const char *weeks[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+char *make_http_time(time_t *t, char *buf) {
+    struct tm *p;
+
+    p = gmtime(t);
+
+    sprintf(buf, "%s, %02d %s %d %02d:%02d:%02d GMT",
+	    weeks[p->tm_wday],
+	    p->tm_mday,
+	    months[p->tm_mon],
+	    1900 + p->tm_year,
+	    p->tm_hour,
+	    p->tm_min,
+	    p->tm_sec);
+
+    return buf;
+}
+
+char *make_http_response_header(http_header_t *h, __buffer_t *chain_buf) {
     char *fmt =								\
 	"HTTP/1.1 200 OK\n"						\
 	"Server: route\n" \
 	"Content-Length: %zu\n" \
-	"Date: Sun, 18 Apr 2021 04:13:15 GMT\n"				\
+	"Date: %s\n"				\
 	"Content-Type: text/html; charset=UTF-8\n"			\
 	CRLF;
-    char buf[4049];
-    char *header;
+    char buf[4049], http_time_buf[1024], *header;
     size_t buf_size = sizeof(buf);
+    time_t t;
+
+    memset(http_time_buf, 0, sizeof(http_time_buf));
+    t = time(&t);
+    *http_time_buf = *make_http_time(&t, http_time_buf);
 
     memset(buf, 0, buf_size);
-    format_string(buf, buf_size, fmt, size);
+    format_string(buf, buf_size, fmt, h->size, http_time_buf);
 
     header = chain_buf->pos;
     memcpy(header, buf, buf_size);
@@ -33,8 +58,8 @@ char *make_http_response_header(size_t size, __buffer_t *chain_buf) {
     return header;
 }
 
-http_request_header_t *new_http_request_header(void) {
-    http_request_header_t *header = calloc(1, sizeof(http_request_header_t));
+http_header_t *new_http_request_header(void) {
+    http_header_t *header = calloc(1, sizeof(http_header_t));
 
     header->start = NULL;
     header->method = 0;
@@ -43,18 +68,8 @@ http_request_header_t *new_http_request_header(void) {
     return header;
 }
 
-http_response_payload_t *new_http_response_payload(char *header, char *body) {
-    http_response_payload_t *http_payload = malloc(sizeof(http_response_payload_t));
-    http_response_payload_t hrp = {
-	.header = header,
-	.body = body
-    };
-    *http_payload = hrp;
-    return http_payload;
-}
-
 http_request_payload_t *new_http_request_payload(void) {
-    http_request_header_t *header = new_http_request_header();
+    http_header_t *header = new_http_request_header();
     http_request_payload_t *request = calloc(1, sizeof(http_request_payload_t));
 
     http_request_payload_t req = {
@@ -66,7 +81,7 @@ http_request_payload_t *new_http_request_payload(void) {
 }
 
 route_int
-parse_http_request_header_start(http_request_header_t *header, const char *line_buf) {
+parse_http_request_header_start(http_header_t *header, const char *line_buf) {
     __buffer_t *buf = alloc_new_buffer(line_buf);
 
     header->start = buf;
@@ -149,6 +164,7 @@ parse_http_request_header_start(http_request_header_t *header, const char *line_
     }
 
     if (header->method == 0) {
+	printf("5\n");
 	goto error;
     }
 
@@ -165,7 +181,7 @@ parse_http_request_header_start(http_request_header_t *header, const char *line_
 #define CR '\r'
 
 route_int
-parse_http_request_header(http_request_header_t *header, const __buffer_t *header_buf) {
+parse_http_request_header(http_header_t *header, const __buffer_t *header_buf) {
     enum {
 	start = 0,
 	almost_done,
@@ -223,7 +239,6 @@ parse_http_request_header(http_request_header_t *header, const __buffer_t *heade
     line_length = 0;
 
     for (p = header_buf->pos + header->start->size; p < header_buf->end; ++p) {
-
 	ch = *p;
 
 	switch (ch) {
