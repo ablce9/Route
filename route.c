@@ -132,6 +132,12 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     size_t response_size;
     __buffer_t *chain_buf;
     char *header_buffer, *file_buf;
+    uv_buf_t response_vec[2];
+    http_request_payload_t *request_payload;
+    __buffer_t *http_request_header_buf;
+    route_int parsed_status;
+    request_data_t *data_p;
+    uv_write_t *writer;
 
     if (nread <= 0) {
 	uv_close((uv_handle_t*)handle, invalid_request_close_cb);
@@ -139,8 +145,6 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     }
 
     r = (region_t *)handle->data;
-
-    uv_buf_t response_vec[2];
 
     chain_buf = create_chain_buffer(r, sizeof(char *) * 4049);
 
@@ -163,23 +167,23 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
 	.body = file_buf
     };
 
-    http_request_payload_t *request_payload = new_http_request_payload();
-    __buffer_t *http_request_header_buf = alloc_new_buffer(request_buf->base);
+    request_payload = new_http_request_payload();
+    http_request_header_buf = alloc_new_buffer(request_buf->base);
 
-    route_int parsed_status = parse_http_request_header(request_payload->header, http_request_header_buf);
+    parsed_status = parse_http_request_header(request_payload->header, http_request_header_buf);
     if (parsed_status != ROUTE_OK) {
 	goto error;
     }
 
-    request_data_t *data_p = calloc(1, sizeof(request_data_t));
-    request_data_t data = {
+    data_p = calloc(1, sizeof(request_data_t));
+	request_data_t  data = {
 	.response = &response_payload,
 	.request = request_payload
     };
     *data_p = data;
     handle->data = (void*)data_p;
 
-    uv_write_t *writer = (uv_write_t*)malloc(sizeof(uv_write_t));
+    writer = (uv_write_t*)malloc(sizeof(uv_write_t));
 
     uv_write(writer, handle, response_vec, 2, write_cb);
 
