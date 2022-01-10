@@ -17,45 +17,43 @@ typedef struct {
     http_request_payload_t *request;
 } request_data_t;
 
-static void prepare_http_header(size_t content_length, uv_buf_t *buf);
-
 static uv_loop_t *loop;
 
 static void close_cb(uv_handle_t* handle) {
-    if (handle->data) {
-	__map_t *map;
-	int i = 0;
-	request_data_t *data = handle->data;
-	http_response_payload_t *response = data->response;
-	http_request_payload_t *request = data->request;
-	__buffer_t *map_value;
-
-	while ((map = request->header->meta[i])) {
-
-	    // map key
-	    free(map->key->bytes);
-	    free(map->key);
-
-	    // map value
-	    map_value = (__buffer_t*)map->value;
-	    free(map_value->bytes);
-	    free(map_value);
-
-	    free(map);
-
-	    ++i;
-	}
-	free(request->header->start->bytes);
-	free(request->header->start);
-	free(request->header);
-	free(request);
-
-	free(response->header);
-	free(response->body);
-	free(response);
-
-	free(data);
-    };
+    // if (handle->data) {
+    //	__map_t *map;
+    //	int i = 0;
+    //	request_data_t *data = handle->data;
+    //	http_response_payload_t *response = data->response;
+    //	http_request_payload_t *request = data->request;
+    //	__buffer_t *map_value;
+    //
+    //	// while ((map = request->header->meta[i])) {
+    //	//
+    //	//     // map key
+    //	//     free(map->key->bytes);
+    //	//     free(map->key);
+    //	//
+    //	//     // map value
+    //	//     map_value = (__buffer_t*)map->value;
+    //	//     free(map_value->bytes);
+    //	//     free(map_value);
+    //	//
+    //	//     free(map);
+    //	//
+    //	//     ++i;
+    //	// }
+    //	// free(request->header->start->bytes);
+    //	// free(request->header->start);
+    //	// free(request->header);
+    //	// free(request);
+    //	//
+    //	// free(response->header);
+    //	// free(response->body);
+    //	// free(response);
+    //	//
+    //	// free(data);
+    // };
     free(handle);
 }
 
@@ -92,26 +90,21 @@ static char *build_http_header(size_t content_length) {
     return header_buffer;
 }
 
-static void prepare_http_header(size_t content_length, uv_buf_t *buf) {
-    char *header_buffer = build_http_header(content_length);
-
-    buf->base = header_buffer;
-    buf->len = strlen(header_buffer);
-}
-
-static int make_file_buffer(uv_buf_t *file_buffer) {
+static size_t make_file_buffer(char *out) {
     const char *filename = "index.html";
     uv_fs_t stat_req;
     int result = uv_fs_stat(NULL, &stat_req, filename, NULL);
-    if (result != 0) return 0;
+    if (result != 0) {
+	return -1;
+    }
 
     size_t file_size = ((uv_stat_t*)&stat_req.statbuf)->st_size;
-    char *read_file_buffer = malloc(sizeof(char)*file_size);
-    memset(read_file_buffer, 0, file_size);
+
+    memset(out, 0, file_size);
 
     uv_fs_t open_req, read_req, close_req;
     uv_buf_t read_file_data = {
-	.base = read_file_buffer,
+	.base = out,
 	.len = file_size,
     };
 
@@ -119,7 +112,6 @@ static int make_file_buffer(uv_buf_t *file_buffer) {
     uv_fs_read(NULL, &read_req, open_req.result, &read_file_data, 1, 0, NULL);
     uv_fs_close(NULL, &close_req, open_req.result, NULL);
 
-    *file_buffer = read_file_data;
     return file_size;
 }
 
@@ -131,24 +123,45 @@ static void write_cb(uv_write_t *request, int status) {
     free(request);
 }
 
-static uv_buf_t* new_http_iovec() {
-    uv_buf_t* iovec = malloc(sizeof(uv_buf_t)*2);
-    return iovec;
-}
-
 static void invalid_request_close_cb(uv_handle_t* handle) {
     free(handle);
 }
 
 static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_buf) {
+    region_t *r;
+    size_t response_size;
+    __buffer_t *chain_buf;
+    char *header_buffer, *file_buf;
+
     if (nread <= 0) {
 	uv_close((uv_handle_t*)handle, invalid_request_close_cb);
 	return;
     }
 
-    uv_buf_t *response_vec = new_http_iovec();
-    prepare_http_header(make_file_buffer(&response_vec[1]), &response_vec[0]);
-    http_response_payload_t *response_payload = new_http_response_payload(response_vec[0].base, response_vec[1].base);
+    r = (region_t *)handle->data;
+
+    uv_buf_t response_vec[2];
+
+    chain_buf = create_chain_buffer(r, sizeof(char *) * 4049);
+
+    file_buf = chain_buf->pos;
+    response_size = make_file_buffer(file_buf);
+    chain_buf->pos += sizeof(char *) * response_size;
+
+    header_buffer = build_http_header(response_size);
+
+    // set header
+    response_vec[0].base = header_buffer;
+    response_vec[0].len = strlen(header_buffer);
+
+    // set body
+    response_vec[1].base = file_buf;
+    response_vec[1].len = response_size;
+
+    http_response_payload_t response_payload = {
+	.header = header_buffer,
+	.body = file_buf
+    };
 
     http_request_payload_t *request_payload = new_http_request_payload();
     __buffer_t *http_request_header_buf = alloc_new_buffer(request_buf->base);
@@ -160,13 +173,14 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
 
     request_data_t *data_p = calloc(1, sizeof(request_data_t));
     request_data_t data = {
-	.response = response_payload,
+	.response = &response_payload,
 	.request = request_payload
     };
     *data_p = data;
     handle->data = (void*)data_p;
 
     uv_write_t *writer = (uv_write_t*)malloc(sizeof(uv_write_t));
+
     uv_write(writer, handle, response_vec, 2, write_cb);
 
     uv_close((uv_handle_t*)handle, close_cb);
@@ -175,7 +189,6 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     free(http_request_header_buf);
 
     free(request_buf->base);
-    free(response_vec);
 
     return;
 
@@ -184,16 +197,21 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     uv_close((uv_handle_t*)handle, invalid_request_close_cb);
 
     free(request_buf->base);
-    free(response_vec);
 }
 
 void on_new_connection(uv_stream_t* server, int status) {
+    region_t *r;
+    uv_tcp_t *client;
+
     if (status < 0) {
 	fprintf(stderr, "new connection error: %s\n", uv_strerror(status));
 	return;
     }
 
-    uv_tcp_t *client = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
+    r = create_region();
+
+    client = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
+    client->data = (void *)r;
 
     uv_tcp_init(loop, client);
 
