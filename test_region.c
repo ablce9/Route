@@ -26,7 +26,7 @@ int main() {
 
 	for (ii = 0; ii < 10; ii++) {
 	    point_t *point;
-	    point = (point_t*)(r + sizeof(region_t) + sizeof(point_t) * ii);
+	    point = (point_t*)(r + sizeof(point_t) * ii);
 
 	    point->x = rand();
 	    point->y = rand();
