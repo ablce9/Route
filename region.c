@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "region.h"
 
 #define POOL_ALIGNMENT 8
@@ -44,6 +45,8 @@ region_t *ralloc(region_t *r, size_t region_size) {
 
     base_size = sizeof(region_t) + region_size;
     m = malloc(base_size + ALIGN_PADDING(base_size));
+    memset(m, 0, base_size + ALIGN_PADDING(base_size));
+
     if (m == NULL) {
 	return NULL;
     }
