@@ -22,6 +22,7 @@ __buffer_t *create_chain_buffer(region_t *r, size_t size) {
 
     buf->pos = buf->start;
     buf->end = buf->start + size;
+    buf->size = size;
 
     return buf;
 }

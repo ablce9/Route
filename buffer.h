@@ -8,10 +8,19 @@
 typedef struct {
     size_t size;
     char *bytes;
+    char *p;
     char *pos;
     char *start;
     char *end;
 } __buffer_t;
+
+#define BUFFER_CURRENT_SIZE(s, e, p) (s - ((e - p)/sizeof(char *)))
+
+#define BUFFER_MOVE(p, b, s)				\
+    do { \
+	p = b; \
+	b += s * sizeof(char *);		\
+    } while(0);
 
 __buffer_t *create_chain_buffer(region_t *r, size_t size);
 __buffer_t *alloc_new_buffer(const char *buffer);
