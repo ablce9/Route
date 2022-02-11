@@ -1,6 +1,8 @@
 #ifndef __REGION_H
 #define __REGION_H
 
+#include <unistd.h>
+
 typedef struct region_s region_t;
 struct region_s {
     size_t max;
