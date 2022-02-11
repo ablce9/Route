@@ -13,53 +13,26 @@
 #define CRLF "\r\n"
 
 typedef struct {
-    http_response_payload_t *response;
-    http_request_payload_t *request;
-} request_data_t;
+    region_t *r;
+    __buffer_t *rb;
+} request_context_t;
 
 static uv_loop_t *loop;
 
 static void close_cb(uv_handle_t* handle) {
-    // if (handle->data) {
-    //	__map_t *map;
-    //	int i = 0;
-    //	request_data_t *data = handle->data;
-    //	http_response_payload_t *response = data->response;
-    //	http_request_payload_t *request = data->request;
-    //	__buffer_t *map_value;
-    //
-    //	// while ((map = request->header->meta[i])) {
-    //	//
-    //	//     // map key
-    //	//     free(map->key->bytes);
-    //	//     free(map->key);
-    //	//
-    //	//     // map value
-    //	//     map_value = (__buffer_t*)map->value;
-    //	//     free(map_value->bytes);
-    //	//     free(map_value);
-    //	//
-    //	//     free(map);
-    //	//
-    //	//     ++i;
-    //	// }
-    //	// free(request->header->start->bytes);
-    //	// free(request->header->start);
-    //	// free(request->header);
-    //	// free(request);
-    //	//
-    //	// free(response->header);
-    //	// free(response->body);
-    //	// free(response);
-    //	//
-    //	// free(data);
-    // };
-    free(handle);
-}
+    request_context_t *ctx;
+    region_t *r;
+    // __buffer_t *chain_buf;
 
-static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
-    buf->base = calloc(suggested_size, sizeof(char));
-    buf->len = suggested_size;
+    ctx = (request_context_t *)handle->data;
+    // chain_buf = ctx->rb;
+    r = (region_t *)ctx->r;
+
+    destroy_regions(r);
+
+    free(ctx);
+    // free(chain_buf);
+    free(handle);
 }
 
 static void format_string(char *string, size_t size, char *fmt, ...)
@@ -90,7 +63,7 @@ static char *build_http_header(size_t content_length) {
     return header_buffer;
 }
 
-static size_t make_file_buffer(char *out) {
+static size_t make_file_buffer(char *buf) {
     const char *filename = "index.html";
     uv_fs_t stat_req;
     int result = uv_fs_stat(NULL, &stat_req, filename, NULL);
@@ -99,18 +72,21 @@ static size_t make_file_buffer(char *out) {
     }
 
     size_t file_size = ((uv_stat_t*)&stat_req.statbuf)->st_size;
-
-    memset(out, 0, file_size);
+    char fbuf[file_size];
+    memset(fbuf, 0, file_size);
 
     uv_fs_t open_req, read_req, close_req;
     uv_buf_t read_file_data = {
-	.base = out,
+	.base = fbuf,
 	.len = file_size,
     };
 
     uv_fs_open(NULL, &open_req, filename, O_RDONLY, 0, NULL);
     uv_fs_read(NULL, &read_req, open_req.result, &read_file_data, 1, 0, NULL);
     uv_fs_close(NULL, &close_req, open_req.result, NULL);
+
+    fbuf[file_size] = '\0';
+    memcpy(buf, fbuf, file_size);
 
     return file_size;
 }
@@ -128,15 +104,13 @@ static void invalid_request_close_cb(uv_handle_t* handle) {
 }
 
 static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_buf) {
-    region_t *r;
+    request_context_t *ctx;
     size_t response_size;
     __buffer_t *chain_buf;
     char *header_buffer, *file_buf;
     uv_buf_t response_vec[2];
     http_request_payload_t *request_payload;
-    __buffer_t *http_request_header_buf;
     route_int parsed_status;
-    request_data_t *data_p;
     uv_write_t *writer;
 
     if (nread <= 0) {
@@ -144,13 +118,15 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
 	return;
     }
 
-    r = (region_t *)handle->data;
+    ctx = (request_context_t *)handle->data;
 
-    chain_buf = create_chain_buffer(r, sizeof(char *) * 4049);
+    // Move memory forward for pre-alloced memory by libuv.
+    ctx->rb->pos += sizeof(char *) * nread;
 
-    file_buf = chain_buf->pos;
-    response_size = make_file_buffer(file_buf);
-    chain_buf->pos += sizeof(char *) * response_size;
+    chain_buf = ctx->rb;
+
+    response_size = make_file_buffer(chain_buf->pos);
+    BUFFER_MOVE(file_buf, chain_buf->pos, response_size);
 
     header_buffer = build_http_header(response_size);
 
@@ -162,38 +138,21 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     response_vec[1].base = file_buf;
     response_vec[1].len = response_size;
 
-    http_response_payload_t response_payload = {
-	.header = header_buffer,
-	.body = file_buf
-    };
-
     request_payload = new_http_request_payload();
-    http_request_header_buf = alloc_new_buffer(request_buf->base);
 
-    parsed_status = parse_http_request_header(request_payload->header, http_request_header_buf);
+    chain_buf->pos = request_buf->base;
+
+    parsed_status = parse_http_request_header(request_payload->header, chain_buf);
+
     if (parsed_status != ROUTE_OK) {
 	goto error;
     }
-
-    data_p = calloc(1, sizeof(request_data_t));
-	request_data_t  data = {
-	.response = &response_payload,
-	.request = request_payload
-    };
-    *data_p = data;
-    handle->data = (void*)data_p;
 
     writer = (uv_write_t*)malloc(sizeof(uv_write_t));
 
     uv_write(writer, handle, response_vec, 2, write_cb);
 
     uv_close((uv_handle_t*)handle, close_cb);
-
-    free(http_request_header_buf->bytes);
-    free(http_request_header_buf);
-
-    free(request_buf->base);
-
     return;
 
  error:
@@ -203,7 +162,27 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     free(request_buf->base);
 }
 
-void on_new_connection(uv_stream_t* server, int status) {
+static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
+    request_context_t *ctx;
+    region_t *r;
+    __buffer_t *rb;
+
+    r = (region_t *)handle->data;
+    rb = create_chain_buffer(r, sizeof(char *) * 2024 * 16);
+
+    r = ralloc(r, sizeof(request_context_t));
+
+    ctx = (request_context_t *)r;
+    ctx->r = r;
+    ctx->rb = rb;
+
+    buf->base = rb->pos;
+    buf->len = suggested_size;
+
+    handle->data = (void *)ctx;
+}
+
+static void on_new_connection(uv_stream_t* server, int status) {
     region_t *r;
     uv_tcp_t *client;
 
