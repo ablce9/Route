@@ -82,10 +82,6 @@ http_request_payload_t *new_http_request_payload(void) {
 
 route_int
 parse_http_request_header_start(http_header_t *header, const char *line_buf) {
-    __buffer_t *buf = alloc_new_buffer(line_buf);
-
-    header->start = buf;
-
     enum {
 	start = 0,
 	method,
@@ -95,7 +91,7 @@ parse_http_request_header_start(http_header_t *header, const char *line_buf) {
     state = start;
 
     char *p, ch, *request_start;
-    for (p = buf->pos; p < buf->end; p++) {
+    for (p = (char *)line_buf; p < line_buf + sizeof(line_buf); p++) {
 
 	ch = *p;
 
@@ -109,7 +105,7 @@ parse_http_request_header_start(http_header_t *header, const char *line_buf) {
 	case method:
 	    if (ch == ' ') {
 
-		switch(p - buf->start) {
+		switch(p - line_buf) {
 
 		case 3:
 		    if (str4comp(request_start, 'G', 'E', 'T', ' ')) {
@@ -164,7 +160,6 @@ parse_http_request_header_start(http_header_t *header, const char *line_buf) {
     }
 
     if (header->method == 0) {
-	printf("5\n");
 	goto error;
     }
 
@@ -181,7 +176,7 @@ parse_http_request_header_start(http_header_t *header, const char *line_buf) {
 #define CR '\r'
 
 route_int
-parse_http_request_header(http_header_t *header, const __buffer_t *header_buf) {
+parse_http_request_header(http_header_t *header, __buffer_t *header_buf) {
     enum {
 	start = 0,
 	almost_done,
@@ -208,7 +203,9 @@ parse_http_request_header(http_header_t *header, const __buffer_t *header_buf) {
 
 	case LF:
 	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
+
 		line[line_length] = '\0';
+
 		parsed_status = parse_http_request_header_start(header, line);
 
 		if (parsed_status != ROUTE_OK) {
@@ -230,6 +227,12 @@ parse_http_request_header(http_header_t *header, const __buffer_t *header_buf) {
 	}
     }
 
+    BUFFER_MOVE(header->start, header_buf->pos, line_length);
+    memcpy(header->start, line, line_length);
+    // header->start = header_buf->pos;
+    //memcpy(header->start, line, line_length);
+    // header_buf->pos += line_length * sizeof(char *);
+
     if (!header->start) {
 	goto error;
     }
@@ -238,7 +241,8 @@ parse_http_request_header(http_header_t *header, const __buffer_t *header_buf) {
     state = start;
     line_length = 0;
 
-    for (p = header_buf->pos + header->start->size; p < header_buf->end; ++p) {
+    for (p = header->start; p < header->start + sizeof(header->start); ++p) {
+
 	ch = *p;
 
 	switch (ch) {
