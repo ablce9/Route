@@ -101,7 +101,7 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     request_context_t *ctx;
     region_t *r;
     size_t response_size;
-    __buffer_t *chain_buf, reqb;;
+    __buffer_t *chain_buf, reqb;
     char *file_buf;
     uv_buf_t response_vec[2];
     http_request_payload_t *request_payload;
@@ -140,9 +140,9 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     r = new_http_request_payload(r);
     request_payload = (http_request_payload_t *)r;
 
-    reqb.pos = chain_buf->pos;
+    reqb.pos = request_buf->base;
     reqb.end = reqb.pos + (sizeof(char *) * nread);
-    parsed_status = parse_http_request_header(request_payload->header, &reqb);
+    parsed_status = parse_http_request(request_payload->header, &reqb, chain_buf);
 
     if (parsed_status != ROUTE_OK) {
 	goto error;
