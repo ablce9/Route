@@ -58,26 +58,28 @@ char *make_http_response_header(http_header_t *h, __buffer_t *chain_buf) {
     return header;
 }
 
-http_header_t *new_http_request_header(void) {
-    http_header_t *header = calloc(1, sizeof(http_header_t));
+region_t *new_http_request_header(region_t *r) {
+    http_header_t *header;
 
+    r = ralloc(r, sizeof(http_header_t));
+    header = (http_header_t *)r;
     header->start = NULL;
     header->method = 0;
     header->start_length = 0;
 
-    return header;
+    return r;
 }
 
-http_request_payload_t *new_http_request_payload(void) {
-    http_header_t *header = new_http_request_header();
-    http_request_payload_t *request = calloc(1, sizeof(http_request_payload_t));
+region_t *new_http_request_payload(region_t *r) {
+    region_t *new = new_http_request_header(r);
+    http_header_t *header = (http_header_t *)new;
+    http_request_payload_t *request;
 
-    http_request_payload_t req = {
-	.header = header
-    };
-    *request = req;
+    new = ralloc(new, sizeof(http_request_payload_t));
+    request =  (http_request_payload_t *)new;
+    request->header = header;
 
-    return request;
+    return new;
 }
 
 route_int
@@ -229,9 +231,6 @@ parse_http_request_header(http_header_t *header, __buffer_t *header_buf) {
 
     BUFFER_MOVE(header->start, header_buf->pos, line_length);
     memcpy(header->start, line, line_length);
-    // header->start = header_buf->pos;
-    //memcpy(header->start, line, line_length);
-    // header_buf->pos += line_length * sizeof(char *);
 
     if (!header->start) {
 	goto error;

@@ -46,8 +46,8 @@ typedef struct {
 route_int parse_http_request_header_start(http_header_t *header, const char *line_buf);
 route_int parse_http_request_header(http_header_t *header, __buffer_t *header_buf);
 __map_t *parse_http_request_meta_header_line(const char *line_buf);
-http_header_t *new_http_request_header(void);
-http_request_payload_t *new_http_request_payload(void);
+region_t *new_http_request_header(region_t *r);
+region_t *new_http_request_payload(region_t *r);
 char *make_http_response_header(http_header_t *h, __buffer_t *chain_buf);
 char *make_http_time(time_t *t, char *buf);
 
