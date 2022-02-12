@@ -183,7 +183,6 @@ static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *b
 }
 
 static void on_new_connection(uv_stream_t* server, int status) {
-    region_t *r;
     uv_tcp_t *client;
 
     if (status < 0) {
