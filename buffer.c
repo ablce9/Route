@@ -8,14 +8,13 @@
 
 __buffer_t *create_chain_buffer(region_t *r, size_t size) {
     __buffer_t *buf;
+    region_t *new;
 
-    buf = calloc(1, sizeof(__buffer_t));
-    if (buf == NULL) {
-	return NULL;
-    }
+    new = ralloc(r, sizeof(__buffer_t) + size);
+    r = new;
+    buf = (__buffer_t *)new;
 
-    r = ralloc(r, size);
-    buf->start = (char *)(r + sizeof(region_t));
+    buf->start = (char *)(buf + sizeof(__buffer_t));
     if (buf->start == NULL) {
 	return NULL;
     }
