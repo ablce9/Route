@@ -29,7 +29,7 @@ typedef struct {
     char *start;
     uint8_t      method;
     size_t       size;
-    int          start_length;
+    size_t       start_size;
     __map_t    *meta[1024];
 } http_header_t;
 
@@ -44,8 +44,7 @@ typedef struct {
 } http_request_payload_t;
 
 route_int parse_http_request_start(http_header_t *header, const char *line_buf);
-route_int parse_http_request(http_header_t *header, __buffer_t *header_buf, __buffer_t *chain_buf);
-__map_t *parse_http_request_meta_header_line(const char *line_buf);
+route_int parse_http_request(http_header_t *header, __buffer_t *header_buf, __buffer_t *chain_buf, __map_t *map);
 region_t *new_http_request_header(region_t *r);
 region_t *new_http_request_payload(region_t *r);
 char *make_http_response_header(http_header_t *h, __buffer_t *chain_buf);

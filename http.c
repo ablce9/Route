@@ -15,6 +15,45 @@ static void format_string(char *string, size_t size, char *fmt, ...);
 const char *weeks[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
+static __map_t *parse_http_request_meta_header_line(char *line_buf, __map_t *map, __buffer_t *chain_buf) {
+    char ch, *p, *key_buf, *val_buf;
+    size_t key_size = 0;
+
+    for (p = line_buf; ; key_size++, p++) {
+
+	ch = *p;
+
+	if (ch == ':') {
+	    char key[key_size];
+
+	    memcpy(key, line_buf, key_size);
+	    key[key_size] = '\0';
+
+	    BUFFER_MOVE(key_buf, chain_buf->pos, key_size);
+	    memcpy(key_buf, key, key_size);
+	    map->key = key_buf;
+
+	    break;
+	}
+    }
+
+    // TODO: add line length as param
+    BUFFER_MOVE(val_buf, chain_buf->pos, strnlen(line_buf, 1024) - key_size);
+    val_buf = line_buf + key_size + 2;
+    map->value = (void *)val_buf;
+
+    return map;
+}
+
+static void format_string(char *string, size_t size, char *fmt, ...)
+{
+   va_list arg_ptr;
+
+   va_start(arg_ptr, fmt);
+   vsnprintf(string, size, fmt, arg_ptr);
+   va_end(arg_ptr);
+}
+
 char *make_http_time(time_t *t, char *buf) {
     struct tm *p;
 
@@ -64,7 +103,7 @@ region_t *new_http_request_header(region_t *r) {
     header = (http_header_t *)r;
     header->start = NULL;
     header->method = 0;
-    header->start_length = 0;
+    header->start_size = 0;
 
     return r;
 }
@@ -177,7 +216,7 @@ parse_http_request_start(http_header_t *header, const char *line_buf) {
 #define CR '\r'
 
 route_int
-parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_buf) {
+parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_buf, __map_t *maps) {
     enum {
 	start = 0,
 	almost_done,
@@ -186,8 +225,8 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
     char line[MAX_HTTP_HEADER_LINE_BUFFER_SIZE], ch, *p;
     int line_length = 0, map_index = 0;
-    __map_t *map;
     route_int parsed_status;
+    __map_t *map;
 
     state = start;
     memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
@@ -230,6 +269,7 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
     BUFFER_MOVE(header->start, chain_buf->pos, line_length);
     memcpy(header->start, line, line_length);
+    header->start_size = line_length;
 
     if (!header->start) {
 	goto error;
@@ -239,7 +279,11 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
     state = start;
     line_length = 0;
 
-    for (p = header->start; p < header->start + sizeof(header->start); ++p) {
+    __buffer_t header_rest;
+    header_rest.pos = reqb->pos + header->start_size;
+    header_rest.end = reqb->pos + (sizeof(char *) * header->start_size);
+
+    for (p = header_rest.pos; p < header_rest.end; ++p) {
 
 	ch = *p;
 
@@ -250,8 +294,15 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 	    break;
 
 	case LF:
-	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
-		map = parse_http_request_meta_header_line(line);
+	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE && line_length > 0) {
+
+		map = make_map(maps);
+
+		char *line_buf;
+
+		BUFFER_MOVE(line_buf, chain_buf->pos, line_length);
+		memcpy(line_buf, line, line_length);
+		map = parse_http_request_meta_header_line(line_buf, map, chain_buf);
 
 		if (map != NULL) {
 		    header->meta[map_index] = map;
@@ -275,54 +326,4 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
  error:
     return ROUTE_ERROR;
-}
-
-__map_t *parse_http_request_meta_header_line(const char *line_buf) {
-    __buffer_t *buf = alloc_new_buffer(line_buf);
-    if (buf == NULL) {
-	return NULL;
-    }
-
-    __map_t *map = new_map();
-    char ch, *p;
-
-    for (p = buf->pos; p < buf->end; p++) {
-
-	ch = *p;
-
-	if (ch == ':') {
-	    map->key = buffer_bytes_ncpy(buf, p - buf->start);
-	    break;
-	}
-    }
-
-    ++p;
-    buf->pos += p - buf->start;
-
-    for (p = buf->pos; p < buf->end; p++) {
-
-	ch = *p;
-
-	if (ch == '\0') {
-	    __buffer_t *value_buf = alloc_new_buffer(buf->bytes + map->key->size + 1 /* colon */ + 1 /* whitespace */);
-
-	    if (value_buf != NULL) {
-		map->value = (void*)value_buf;
-	    }
-	}
-    }
-
-    free(buf->bytes);
-    free(buf);
-
-    return map;
-}
-
-static void format_string(char *string, size_t size, char *fmt, ...)
-{
-   va_list arg_ptr;
-
-   va_start(arg_ptr, fmt);
-   vsnprintf(string, size, fmt, arg_ptr);
-   va_end(arg_ptr);
 }
