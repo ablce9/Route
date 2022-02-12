@@ -22,16 +22,11 @@ static uv_loop_t *loop;
 static void close_cb(uv_handle_t* handle) {
     request_context_t *ctx;
     region_t *r;
-    // __buffer_t *chain_buf;
 
     ctx = (request_context_t *)handle->data;
-    // chain_buf = ctx->rb;
     r = (region_t *)ctx->r;
 
     destroy_regions(r);
-
-    free(ctx);
-    // free(chain_buf);
     free(handle);
 }
 
@@ -44,7 +39,7 @@ static void format_string(char *string, size_t size, char *fmt, ...)
    va_end(arg_ptr);
 }
 
-static char *build_http_header(size_t content_length) {
+static size_t build_http_header(size_t content_length, char *buf) {
     char *fmt =								\
 	"HTTP/1.1 200 OK\n"						\
 	"Server: route\n" \
@@ -52,15 +47,14 @@ static char *build_http_header(size_t content_length) {
 	"Date: Sun, 18 Apr 2021 04:13:15 GMT\n"				\
 	"Content-Type: text/html; charset=UTF-8\n"			\
 	CRLF;
-    char buf[4049];
+    char header[4049];
 
-    memset(buf, 0, sizeof(buf));
-    format_string(buf, sizeof(buf), fmt, content_length);
+    memset(header, 0, sizeof(header));
+    format_string(header, sizeof(header), fmt, content_length);
 
-    char *header_buffer = malloc(sizeof(char*)*sizeof(buf));
-    memcpy(header_buffer, buf, sizeof(buf));
+    memcpy(buf, header, sizeof(header));
 
-    return header_buffer;
+    return sizeof(header);
 }
 
 static size_t make_file_buffer(char *buf) {
@@ -105,9 +99,10 @@ static void invalid_request_close_cb(uv_handle_t* handle) {
 
 static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_buf) {
     request_context_t *ctx;
+    region_t *r;
     size_t response_size;
-    __buffer_t *chain_buf;
-    char *header_buffer, *file_buf;
+    __buffer_t *chain_buf, reqb;;
+    char *file_buf;
     uv_buf_t response_vec[2];
     http_request_payload_t *request_payload;
     route_int parsed_status;
@@ -119,6 +114,7 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     }
 
     ctx = (request_context_t *)handle->data;
+    r = ctx->r;
 
     // Move memory forward for pre-alloced memory by libuv.
     ctx->rb->pos += sizeof(char *) * nread;
@@ -128,7 +124,10 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     response_size = make_file_buffer(chain_buf->pos);
     BUFFER_MOVE(file_buf, chain_buf->pos, response_size);
 
-    header_buffer = build_http_header(response_size);
+    char *header_buffer;
+    header_buffer = chain_buf->pos;
+    size_t size = build_http_header(response_size, header_buffer);
+    chain_buf->pos += sizeof(char *) * size;
 
     // set header
     response_vec[0].base = header_buffer;
@@ -138,11 +137,12 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     response_vec[1].base = file_buf;
     response_vec[1].len = response_size;
 
-    request_payload = new_http_request_payload();
+    r = new_http_request_payload(r);
+    request_payload = (http_request_payload_t *)r;
 
-    chain_buf->pos = request_buf->base;
-
-    parsed_status = parse_http_request_header(request_payload->header, chain_buf);
+    reqb.pos = chain_buf->pos;
+    reqb.end = reqb.pos + (sizeof(char *) * nread);
+    parsed_status = parse_http_request_header(request_payload->header, &reqb);
 
     if (parsed_status != ROUTE_OK) {
 	goto error;
@@ -167,12 +167,12 @@ static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *b
     region_t *r;
     __buffer_t *rb;
 
-    r = (region_t *)handle->data;
-    rb = create_chain_buffer(r, sizeof(char *) * 2024 * 16);
+    r = (region_t *)create_region();
 
-    r = ralloc(r, sizeof(request_context_t));
+    r = (region_t *)create_chain_buffer(r, sizeof(char *) * 2048 * 16);
+    rb = (__buffer_t *)r;
 
-    ctx = (request_context_t *)r;
+    ctx = (request_context_t *)r + sizeof(request_context_t);
     ctx->r = r;
     ctx->rb = rb;
 
@@ -191,10 +191,7 @@ static void on_new_connection(uv_stream_t* server, int status) {
 	return;
     }
 
-    r = create_region();
-
     client = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
-    client->data = (void *)r;
 
     uv_tcp_init(loop, client);
 
