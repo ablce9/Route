@@ -2,12 +2,13 @@
 #define __MAP_H
 
 #include "./buffer.h"
+#include "./region.h"
 
 typedef struct {
-    __buffer_t *key;
-    void       *value;
+    char *key;
+    void *value;
 } __map_t;
 
-__map_t *new_map(void);
-
+region_t *init_map(region_t *r, size_t size);
+__map_t *make_map(__map_t *map);
 #endif // __MAP_H
