@@ -30,33 +30,6 @@ static void close_cb(uv_handle_t* handle) {
     free(handle);
 }
 
-static void format_string(char *string, size_t size, char *fmt, ...)
-{
-   va_list arg_ptr;
-
-   va_start(arg_ptr, fmt);
-   vsnprintf(string, size, fmt, arg_ptr);
-   va_end(arg_ptr);
-}
-
-static size_t build_http_header(size_t content_length, char *buf) {
-    char *fmt =								\
-	"HTTP/1.1 200 OK\r\n"						\
-	"Server: route\r\n" \
-	"Content-Length: %zu\r\n" \
-	"Date: Sun, 18 Apr 2021 04:13:15 GMT\r\n"				\
-	"Content-Type: text/html\r\n"			\
-	CRLF;
-    char header[4049];
-
-    memset(header, 0, sizeof(header));
-    format_string(header, sizeof(header), fmt, content_length);
-
-    memcpy(buf, header, sizeof(header));
-
-    return sizeof(header);
-}
-
 static size_t make_file_buffer(char *buf) {
     const char *filename = "index.html";
     uv_fs_t stat_req;
@@ -102,11 +75,12 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     region_t *r;
     size_t response_size;
     __buffer_t *chain_buf, reqb;
-    char *file_buf;
+    char *file_buf, *header_buffer;
     uv_buf_t response_vec[2];
     http_request_payload_t *request_payload;
     route_int parsed_status;
     uv_write_t *writer;
+    http_header_t header;
 
     if (nread <= 0) {
 	uv_close((uv_handle_t*)handle, invalid_request_close_cb);
@@ -124,10 +98,8 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     response_size = make_file_buffer(chain_buf->pos);
     BUFFER_MOVE(file_buf, chain_buf->pos, response_size);
 
-    char *header_buffer;
-    header_buffer = chain_buf->pos;
-    size_t size = build_http_header(response_size, header_buffer);
-    chain_buf->pos += sizeof(char *) * size;
+    header.size = response_size;
+    header_buffer = make_http_response_header(&header, chain_buf);
 
     // set header
     response_vec[0].base = header_buffer;
