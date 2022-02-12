@@ -83,7 +83,7 @@ region_t *new_http_request_payload(region_t *r) {
 }
 
 route_int
-parse_http_request_header_start(http_header_t *header, const char *line_buf) {
+parse_http_request_start(http_header_t *header, const char *line_buf) {
     enum {
 	start = 0,
 	method,
@@ -178,7 +178,7 @@ parse_http_request_header_start(http_header_t *header, const char *line_buf) {
 #define CR '\r'
 
 route_int
-parse_http_request_header(http_header_t *header, __buffer_t *header_buf) {
+parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_buf) {
     enum {
 	start = 0,
 	almost_done,
@@ -193,7 +193,7 @@ parse_http_request_header(http_header_t *header, __buffer_t *header_buf) {
     state = start;
     memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
 
-    for (p = header_buf->pos; p < header_buf->end; p++) {
+    for (p = reqb->pos; p < reqb->end; p++) {
 
 	ch = *p;
 
@@ -208,7 +208,7 @@ parse_http_request_header(http_header_t *header, __buffer_t *header_buf) {
 
 		line[line_length] = '\0';
 
-		parsed_status = parse_http_request_header_start(header, line);
+		parsed_status = parse_http_request_start(header, line);
 
 		if (parsed_status != ROUTE_OK) {
 		    goto error;
@@ -229,7 +229,7 @@ parse_http_request_header(http_header_t *header, __buffer_t *header_buf) {
 	}
     }
 
-    BUFFER_MOVE(header->start, header_buf->pos, line_length);
+    BUFFER_MOVE(header->start, chain_buf->pos, line_length);
     memcpy(header->start, line, line_length);
 
     if (!header->start) {

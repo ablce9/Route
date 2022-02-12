@@ -9,14 +9,14 @@
 
 #define CRLF "\r\n"
 
-static int test_parse_http_request_header() {
+static int test_parse_http_request() {
     http_header_t *request_header = calloc(1, sizeof(http_header_t));
     char *raw_header = "GET / HTTP/1.1" CRLF \
 	"Host: google.com" CRLF \
 	"User-Agent: curl/7.74.0" CRLF \
 	"Accept: */*" CRLF;
     __buffer_t *header_buf = alloc_new_buffer(raw_header);
-    route_int result = parse_http_request_header(request_header, header_buf);
+    route_int result = parse_http_request(request_header, header_buf);
 
     assert(result == ROUTE_OK);
     assert(request_header->method == HTTP_REQUEST_METHOD_GET);
@@ -56,7 +56,7 @@ static int test_make_http_header() {
 
 int main() {
     /* todo: free memory */
-    /* test_parse_http_request_header(); */
+    /* test_parse_http_request(); */
     test_make_http_header();
 
     time_t t;
