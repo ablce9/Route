@@ -34,26 +34,25 @@ char *make_http_time(time_t *t, char *buf) {
 
 char *make_http_response_header(http_header_t *h, __buffer_t *chain_buf) {
     char *fmt =								\
-	"HTTP/1.1 200 OK\n"						\
-	"Server: route\n" \
-	"Content-Length: %zu\n" \
-	"Date: %s\n"				\
-	"Content-Type: text/html; charset=UTF-8\n"			\
+	"HTTP/1.1 200 OK\r\n"						\
+	"Server: route\r\n" \
+	"Content-Length: %zu\r\n" \
+	"Date: %s\r\n"				\
+	"Content-Type: text/html; charset=UTF-8\r\n"			\
 	CRLF;
-    char buf[4049], http_time_buf[1024], *header;
+    char buf[4049], http_time_buf[64], *header;
     size_t buf_size = sizeof(buf);
-    time_t t;
+    time_t now;
 
     memset(http_time_buf, 0, sizeof(http_time_buf));
-    t = time(&t);
-    *http_time_buf = *make_http_time(&t, http_time_buf);
+    now = time(&now);
+    make_http_time(&now, http_time_buf);
 
     memset(buf, 0, buf_size);
     format_string(buf, buf_size, fmt, h->size, http_time_buf);
 
-    header = chain_buf->pos;
-    memcpy(header, buf, buf_size);
-    chain_buf->pos += buf_size;
+    memcpy(chain_buf->pos, buf, buf_size);
+    BUFFER_MOVE(header, chain_buf->pos, buf_size);
 
     return header;
 }
