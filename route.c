@@ -41,11 +41,11 @@ static void format_string(char *string, size_t size, char *fmt, ...)
 
 static size_t build_http_header(size_t content_length, char *buf) {
     char *fmt =								\
-	"HTTP/1.1 200 OK\n"						\
-	"Server: route\n" \
-	"Content-Length: %zu\n" \
-	"Date: Sun, 18 Apr 2021 04:13:15 GMT\n"				\
-	"Content-Type: text/html; charset=UTF-8\n"			\
+	"HTTP/1.1 200 OK\r\n"						\
+	"Server: route\r\n" \
+	"Content-Length: %zu\r\n" \
+	"Date: Sun, 18 Apr 2021 04:13:15 GMT\r\n"				\
+	"Content-Type: text/html\r\n"			\
 	CRLF;
     char header[4049];
 
