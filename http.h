@@ -26,11 +26,12 @@
 typedef intptr_t route_int;
 
 typedef struct {
-    char *start;
-    uint8_t      method;
-    size_t       size;
-    size_t       start_size;
-    __map_t    *meta[1024];
+    char      *start;
+    size_t    size;
+    size_t    start_size;
+    uint8_t   method;
+    __map_t   *meta[1024];
+    region_t  *r;
 } http_header_t;
 
 typedef struct {
@@ -39,15 +40,15 @@ typedef struct {
 } http_response_payload_t;
 
 typedef struct {
+    region_t      *r;
     http_header_t *header;
     // todo: add body
 } http_request_payload_t;
 
 route_int parse_http_request_start(http_header_t *header, const char *line_buf);
 route_int parse_http_request(http_header_t *header, __buffer_t *header_buf, __buffer_t *chain_buf, __map_t *map);
-region_t *new_http_request_header(region_t *r);
-region_t *new_http_request_payload(region_t *r);
-char *make_http_response_header(http_header_t *h, __buffer_t *chain_buf);
-char *make_http_time(time_t *t, char *buf);
+http_header_t *new_http_request_header(region_t *r);
+http_request_payload_t *new_http_request_payload(region_t *r);
+char *make_http_response_header(http_header_t *h, char *chain_buf);
 
 #endif //  __HTTP_H

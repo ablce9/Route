@@ -6,12 +6,11 @@
 #include "region.h"
 
 typedef struct {
-    size_t size;
-    char *bytes;
-    char *p;
-    char *pos;
-    char *start;
-    char *end;
+    size_t   size;
+    char     *pos;
+    char     *start;
+    char     *end;
+    region_t *r;
 } __buffer_t;
 
 #define BUFFER_CURRENT_SIZE(s, e, p) (s - ((e - p)/sizeof(char *)))

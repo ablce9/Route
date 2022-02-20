@@ -13,15 +13,15 @@
 #define CRLF "\r\n"
 
 typedef struct {
-    region_t *r;
-    __buffer_t *rb;
+    region_t    *r;
+    __buffer_t  *rb;
 } request_context_t;
 
 static uv_loop_t *loop;
 
 static void close_cb(uv_handle_t* handle) {
+    region_t          *r;
     request_context_t *ctx;
-    region_t *r;
 
     ctx = (request_context_t *)handle->data;
     r = (region_t *)ctx->r;
@@ -34,6 +34,7 @@ static size_t make_file_buffer(char *buf) {
     const char *filename = "index.html";
     uv_fs_t stat_req;
     int result = uv_fs_stat(NULL, &stat_req, filename, NULL);
+
     if (result != 0) {
 	return -1;
     }
@@ -67,6 +68,13 @@ static void write_cb(uv_write_t *request, int status) {
 }
 
 static void invalid_request_close_cb(uv_handle_t* handle) {
+    request_context_t *ctx;
+    region_t *r;
+
+    ctx = (request_context_t *)handle->data;
+    r = (region_t *)ctx->r;
+
+    destroy_regions(r);
     free(handle);
 }
 
@@ -74,7 +82,7 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     request_context_t *ctx;
     region_t *r;
     size_t response_size;
-    char *file_buf, *header_buffer;
+    char *file_buf;
     uv_buf_t response_vec[2];
     http_request_payload_t *request_payload;
     route_int parsed_status;
@@ -84,6 +92,7 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     __map_t *map;
 
     if (nread <= 0) {
+	printf("n=%ld,b=%s\n", nread, request_buf->base);
 	uv_close((uv_handle_t*)handle, invalid_request_close_cb);
 	return;
     }
@@ -91,7 +100,6 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     ctx = (request_context_t *)handle->data;
     r = ctx->r;
 
-    // Move memory forward for pre-alloced memory by libuv.
     ctx->rb->pos += sizeof(char *) * nread;
 
     chain_buf = ctx->rb;
@@ -100,24 +108,25 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     BUFFER_MOVE(file_buf, chain_buf->pos, response_size);
 
     header.size = response_size;
-    header_buffer = make_http_response_header(&header, chain_buf);
 
-    // set header
+    char header_buffer[4096];
+    make_http_response_header(&header, header_buffer);
+
     response_vec[0].base = header_buffer;
     response_vec[0].len = strlen(header_buffer);
 
-    // set body
     response_vec[1].base = file_buf;
     response_vec[1].len = response_size;
 
-    r = new_http_request_payload(r);
-    request_payload = (http_request_payload_t *)r;
+    map = (__map_t *)init_map(r, 1024);
+    r = map->r;
+
+    request_payload = (http_request_payload_t *)new_http_request_payload(r);
+    r = request_payload->r;
 
     reqb.pos = request_buf->base;
     reqb.end = reqb.pos + (sizeof(char *) * nread);
 
-    r = init_map(r, 1024);
-    map = (__map_t *)r;
     parsed_status = parse_http_request(request_payload->header, &reqb, chain_buf, map);
 
     if (parsed_status != ROUTE_OK) {
@@ -125,6 +134,10 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     }
 
     writer = (uv_write_t*)malloc(sizeof(uv_write_t));
+
+    ctx->r = r;
+    ctx->rb = chain_buf;
+    handle->data = (void *)ctx;
 
     uv_write(writer, handle, response_vec, 2, write_cb);
 
@@ -138,18 +151,36 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     free(request_buf->base);
 }
 
-static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
+static request_context_t *make_request_context(region_t *r) {
+    void              *m;
+    region_t          *new;
     request_context_t *ctx;
-    region_t *r;
-    __buffer_t *rb;
 
-    r = (region_t *)create_region();
+    m = ralloc(r, sizeof(request_context_t));
+    if (m == NULL) {
+	return NULL;
+    }
 
-    r = (region_t *)create_chain_buffer(r, sizeof(char *) * 2048 * 16);
-    rb = (__buffer_t *)r;
+    new = (region_t *)m;
+    m += sizeof(region_t);
+    ctx = (request_context_t *)m;
 
-    ctx = (request_context_t *)r + sizeof(request_context_t);
-    ctx->r = r;
+    ctx->r = new;
+    ctx->rb = NULL;
+
+    return ctx;
+}
+
+static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
+    region_t          *r;
+    __buffer_t        *rb;
+    request_context_t *ctx;
+
+    r = create_region();
+
+    rb = create_chain_buffer(r, sizeof(char *) * 1024 * 16);
+
+    ctx = make_request_context(rb->r);
     ctx->rb = rb;
 
     buf->base = rb->pos;

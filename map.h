@@ -5,8 +5,9 @@
 #include "./region.h"
 
 typedef struct {
-    char *key;
-    void *value;
+    char     *key;
+    void     *value;
+    region_t *r;
 } __map_t;
 
 region_t *init_map(region_t *r, size_t size);

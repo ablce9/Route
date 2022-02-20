@@ -54,7 +54,7 @@ static void format_string(char *string, size_t size, char *fmt, ...)
    va_end(arg_ptr);
 }
 
-char *make_http_time(time_t *t, char *buf) {
+static char *make_http_time(time_t *t, char *buf) {
     struct tm *p;
 
     p = gmtime(t);
@@ -71,7 +71,7 @@ char *make_http_time(time_t *t, char *buf) {
     return buf;
 }
 
-char *make_http_response_header(http_header_t *h, __buffer_t *chain_buf) {
+char *make_http_response_header(http_header_t *h, char *chain_buf) {
     char *fmt =								\
 	"HTTP/1.1 200 OK\r\n"						\
 	"Server: route\r\n" \
@@ -79,45 +79,70 @@ char *make_http_response_header(http_header_t *h, __buffer_t *chain_buf) {
 	"Date: %s\r\n"				\
 	"Content-Type: text/html; charset=UTF-8\r\n"			\
 	CRLF;
-    char buf[4049], http_time_buf[64], *header;
+    char buf[4096], http_time_buf[64];
     size_t buf_size = sizeof(buf);
     time_t now;
 
-    memset(http_time_buf, 0, sizeof(http_time_buf));
     now = time(&now);
+
     make_http_time(&now, http_time_buf);
 
-    memset(buf, 0, buf_size);
-    format_string(buf, buf_size, fmt, h->size, http_time_buf);
+    format_string(chain_buf, buf_size, fmt, h->size, http_time_buf);
 
-    memcpy(chain_buf->pos, buf, buf_size);
-    BUFFER_MOVE(header, chain_buf->pos, buf_size);
-
-    return header;
+    return chain_buf;
 }
 
-region_t *new_http_request_header(region_t *r) {
-    http_header_t *header;
+http_header_t *new_http_request_header(region_t *r) {
+    void                    *m;
+    region_t                *new;
+    http_header_t           *header;
 
-    r = ralloc(r, sizeof(http_header_t));
-    header = (http_header_t *)r;
+    m = ralloc(r, sizeof(http_header_t));
+    if (m == NULL) {
+	return NULL;
+    }
+
+    new = (region_t *)m;
+    m += sizeof(region_t);
+
+    header = (http_header_t *)m;
+
+    header->r = new;
     header->start = NULL;
     header->method = 0;
     header->start_size = 0;
 
-    return r;
+    return header;
 }
 
-region_t *new_http_request_payload(region_t *r) {
-    region_t *new = new_http_request_header(r);
-    http_header_t *header = (http_header_t *)new;
-    http_request_payload_t *request;
+http_request_payload_t *new_http_request_payload(region_t *r) {
+    void                    *m;
+    region_t                *new;
+    http_header_t           *header;
+    http_request_payload_t  *request;
 
-    new = ralloc(new, sizeof(http_request_payload_t));
-    request =  (http_request_payload_t *)new;
+    m = ralloc(r, sizeof(http_request_payload_t));
+    if (m == NULL) {
+	return NULL;
+    }
+
+    new = (region_t *)m;
+    m += sizeof(region_t);
+
+    request = (http_request_payload_t *)m;
+    if (request == NULL) {
+	return NULL;
+    }
+
+    header = new_http_request_header(new);
+    if (header == NULL) {
+	return NULL;
+    }
+
     request->header = header;
+    request->r = header->r;
 
-    return new;
+    return request;
 }
 
 route_int
@@ -268,7 +293,7 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
     }
 
     BUFFER_MOVE(header->start, chain_buf->pos, line_length);
-    memcpy(header->start, line, line_length);
+
     header->start_size = line_length;
 
     if (!header->start) {
@@ -296,12 +321,13 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 	case LF:
 	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE && line_length > 0) {
 
-		map = make_map(maps);
-
 		char *line_buf;
 
 		BUFFER_MOVE(line_buf, chain_buf->pos, line_length);
 		memcpy(line_buf, line, line_length);
+		line_buf[line_length] = '\0';
+
+		map = make_map(maps);
 		map = parse_http_request_meta_header_line(line_buf, map, chain_buf);
 
 		if (map != NULL) {
