@@ -3,12 +3,13 @@
 
 #include <unistd.h>
 
+typedef void (*cleanup_t)(void *p);
 typedef struct region_s region_t;
 struct region_s {
-    size_t max;
-
-    region_t *current;
-    region_t *next;
+    size_t     max;
+    region_t   *current;
+    region_t   *next;
+    cleanup_t  cleanup;
 };
 
 region_t *create_region();

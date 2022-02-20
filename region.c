@@ -2,21 +2,20 @@
 #include <string.h>
 #include "region.h"
 
-#define POOL_ALIGNMENT 8
-#define ALIGN_PADDING(x) ((__SIZE_MAX__ - (x) + 1) & (POOL_ALIGNMENT - 1))
-
 region_t *create_region() {
+    size_t   max_regions_size;
     region_t *r;
-    size_t max_regions_size;
 
     r = malloc(sizeof(region_t));
     if (r == NULL) {
 	return NULL;
     }
+    memset(r, 0, sizeof(region_t));
 
     max_regions_size = 16 * 1024;
-    r->max = max_regions_size;
 
+    r->cleanup = NULL;
+    r->max = max_regions_size;
     r->current = r;
     r->next = NULL;
 
@@ -32,6 +31,11 @@ void destroy_regions(region_t *r) {
     while (p) {
 	tmp = p;
 	p = p->next;
+
+	if (tmp->cleanup != NULL) {
+	    tmp->cleanup(tmp);
+	}
+
 	free(tmp);
     };
 
@@ -39,21 +43,20 @@ void destroy_regions(region_t *r) {
 }
 
 region_t *ralloc(region_t *r, size_t region_size) {
+    size_t   base_size;
     region_t *new;
-    void *m;
-    size_t base_size;
 
     base_size = sizeof(region_t) + region_size;
-    m = malloc(base_size + ALIGN_PADDING(base_size));
-    memset(m, 0, base_size + ALIGN_PADDING(base_size));
-
-    if (m == NULL) {
+    new = malloc(base_size);
+    if (new == NULL) {
 	return NULL;
     }
 
-    new = (region_t*)m;
+    memset(new, 0, base_size);
+
     new->next = NULL;
     new->current = r->current;
+    new->cleanup = NULL;
 
     r->next = new;
 
