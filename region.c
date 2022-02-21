@@ -18,6 +18,7 @@ region_t *create_region() {
     r->max = max_regions_size;
     r->current = r;
     r->next = NULL;
+    r->data = NULL;
 
     return r;
 }
@@ -43,24 +44,29 @@ void destroy_regions(region_t *r) {
 }
 
 region_t *ralloc(region_t *r, size_t region_size) {
+    void     *m;
     size_t   base_size;
-    region_t *new;
+    region_t *new_region;
 
     base_size = sizeof(region_t) + region_size;
-    new = malloc(base_size);
-    if (new == NULL) {
+    m = malloc(base_size);
+    if (m == NULL) {
 	return NULL;
     }
 
-    memset(new, 0, base_size);
+    memset(m, 0, base_size);
 
-    new->next = NULL;
-    new->current = r->current;
-    new->cleanup = NULL;
+    new_region = (region_t *)m;
+    m += sizeof(region_t);
 
-    r->next = new;
+    new_region->next = NULL;
+    new_region->current = r->current;
+    new_region->cleanup = NULL;
+    new_region->data = m;
 
-    return new;
+    r->next = new_region;
+
+    return new_region;
 }
 
 void* alloc_from_region(region_t *region, size_t size) {
