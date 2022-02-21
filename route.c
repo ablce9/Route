@@ -79,17 +79,17 @@ static void invalid_request_close_cb(uv_handle_t* handle) {
 }
 
 static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_buf) {
-    request_context_t *ctx;
-    region_t *r;
-    size_t response_size;
-    char *file_buf;
-    uv_buf_t response_vec[2];
-    http_request_payload_t *request_payload;
-    route_int parsed_status;
-    uv_write_t *writer;
-    http_header_t header;
-    __buffer_t *chain_buf, reqb;
-    __map_t *map;
+    char                       *file_buf, header_buffer[4096];
+    size_t                     response_size;
+    __map_t                    *map;
+    region_t                   *r;
+    uv_buf_t                   response_vec[2];
+    route_int                  parsed_status;
+    __buffer_t                 *chain_buf, reqb;
+    uv_write_t                 *writer;
+    http_header_t              header;
+    request_context_t         *ctx;
+    http_request_payload_t    *request_payload;
 
     if (nread <= 0) {
 	printf("n=%ld,b=%s\n", nread, request_buf->base);
@@ -109,7 +109,6 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
 
     header.size = response_size;
 
-    char header_buffer[4096];
     make_http_response_header(&header, header_buffer);
 
     response_vec[0].base = header_buffer;
