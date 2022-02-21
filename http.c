@@ -93,21 +93,17 @@ char *make_http_response_header(http_header_t *h, char *chain_buf) {
 }
 
 http_header_t *new_http_request_header(region_t *r) {
-    void                    *m;
-    region_t                *new;
-    http_header_t           *header;
+    region_t      *new_region;
+    http_header_t *header;
 
-    m = ralloc(r, sizeof(http_header_t));
-    if (m == NULL) {
+    new_region = ralloc(r, sizeof(http_header_t));
+    if (new_region == NULL) {
 	return NULL;
     }
 
-    new = (region_t *)m;
-    m += sizeof(region_t);
+    header = (http_header_t *)new_region->data;
 
-    header = (http_header_t *)m;
-
-    header->r = new;
+    header->r = new_region;
     header->start = NULL;
     header->method = 0;
     header->start_size = 0;
@@ -116,25 +112,21 @@ http_header_t *new_http_request_header(region_t *r) {
 }
 
 http_request_payload_t *new_http_request_payload(region_t *r) {
-    void                    *m;
-    region_t                *new;
-    http_header_t           *header;
-    http_request_payload_t  *request;
+    region_t               *new_region;
+    http_header_t          *header;
+    http_request_payload_t *request;
 
-    m = ralloc(r, sizeof(http_request_payload_t));
-    if (m == NULL) {
+    new_region = ralloc(r, sizeof(http_request_payload_t));
+    if (new_region == NULL) {
 	return NULL;
     }
 
-    new = (region_t *)m;
-    m += sizeof(region_t);
-
-    request = (http_request_payload_t *)m;
+    request = (http_request_payload_t *)new_region->data;
     if (request == NULL) {
 	return NULL;
     }
 
-    header = new_http_request_header(new);
+    header = new_http_request_header(new_region);
     if (header == NULL) {
 	return NULL;
     }

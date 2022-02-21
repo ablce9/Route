@@ -14,18 +14,15 @@ static void cleanup(void *p) {
 }
 
 __buffer_t *create_chain_buffer(region_t *r, size_t size) {
-    void       *m;
-    region_t   *new;
+    region_t   *new_region;
     __buffer_t *buf;
 
-    m = ralloc(r, sizeof(__buffer_t));
-    if (m == NULL) {
+    new_region = ralloc(r, sizeof(__buffer_t));
+    if (new_region == NULL) {
 	return NULL;
     }
 
-    new = (region_t *)m;
-    m += sizeof(region_t);
-    buf = (__buffer_t *)m;
+    buf = (__buffer_t *)new_region->data;
 
     buf->start = malloc(size);
     if (buf->start == NULL) {
@@ -34,7 +31,7 @@ __buffer_t *create_chain_buffer(region_t *r, size_t size) {
 
     memset(buf->start, 0, size);
 
-    buf->r = new;
+    buf->r = new_region;
     buf->r->cleanup = cleanup;
     buf->pos = buf->start;
     buf->end = buf->start + size;

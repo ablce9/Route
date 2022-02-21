@@ -151,20 +151,17 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
 }
 
 static request_context_t *make_request_context(region_t *r) {
-    void              *m;
-    region_t          *new;
+    region_t          *new_region;
     request_context_t *ctx;
 
-    m = ralloc(r, sizeof(request_context_t));
-    if (m == NULL) {
+    new_region = ralloc(r, sizeof(request_context_t));
+    if (new_region == NULL) {
 	return NULL;
     }
 
-    new = (region_t *)m;
-    m += sizeof(region_t);
-    ctx = (request_context_t *)m;
+    ctx = (request_context_t *)new_region->data;
 
-    ctx->r = new;
+    ctx->r = new_region;
     ctx->rb = NULL;
 
     return ctx;
