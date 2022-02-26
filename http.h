@@ -26,9 +26,7 @@
 typedef intptr_t route_int;
 
 typedef struct {
-    char      *start;
     size_t    size;
-    size_t    start_size;
     uint8_t   method;
     __map_t   *meta[1024];
     region_t  *r;

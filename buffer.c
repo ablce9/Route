@@ -14,18 +14,22 @@ static __buffer_t *realloc_chain_buffer(__buffer_t *buf, size_t want) {
     new_space = realloc((void *)buf->start, new_space_size);
 
     buf->start = (char *)new_space;
-    buf->pos = buf->start;
-    buf->end = buf->start + new_space_size;
+    buf->pos   = buf->start;
+    buf->end   = buf->start + new_space_size;
+
     buf->size += new_space_size;
 
     return buf;
 }
 
 static void cleanup(void *p) {
+    void       *tmp;
     __buffer_t *buf;
 
-    p += sizeof(region_t);
-    buf = (__buffer_t *)p;
+    tmp = p;
+
+    tmp += sizeof(region_t);
+    buf = (__buffer_t *)tmp;
     free(buf->start);
 }
 
@@ -48,11 +52,11 @@ __buffer_t *create_chain_buffer(region_t *r, size_t size) {
 
     memset(buf->start, 0, size);
 
-    buf->r = new_region;
+    buf->r          = new_region;
     buf->r->cleanup = cleanup;
-    buf->pos = buf->start;
-    buf->end = buf->start + size;
-    buf->size = size;
+    buf->pos        = buf->start;
+    buf->end        = buf->start + size;
+    buf->size       = size;
 
     return buf;
 }
@@ -65,7 +69,7 @@ char *split_chain_buffer(__buffer_t *src_buf, size_t size) {
 
     if (remained_space_size < (long)(size * sizeof(char *))) {
 	src_buf = realloc_chain_buffer(src_buf, size);
-	printf("[debug] No space left, allocating new space: %ld bytes\n", size * sizeof(char *));
+	printf("[debug] No space left for buffer, allocating new space: %ld bytes\n", size * sizeof(char *));
     }
 
     new = src_buf->pos;

@@ -174,7 +174,7 @@ static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *b
 
     r = create_region();
 
-    rb = create_chain_buffer(r, sizeof(char *) * 1024 * 16);
+    rb = create_chain_buffer(r, 1024 * 16);
 
     ctx = make_request_context(rb->r);
     ctx->rb = rb;

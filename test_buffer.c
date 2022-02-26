@@ -8,7 +8,7 @@
 #include "buffer.h"
 #include "region.h"
 
-char *generate_entropy(char *buf, int max) {
+static char *generate_entropy(char *buf, int max) {
     int i;
 
     char *words = "abcdefghrjklmnopqrstuvwxyzABCDEFGHRJKLMNOPQRSTUVWXYZ0123456789";
@@ -23,10 +23,10 @@ char *generate_entropy(char *buf, int max) {
 int test_buffer() {
     __buffer_t *buf;
     region_t *r;
-    size_t size = 4049 * 2;
+    size_t size = 50;
 
     r = create_region();
-    buf = create_chain_buffer(r, sizeof(char *) * size);
+    buf = create_chain_buffer(r, size);
 
     int max;
     time_t t;
@@ -37,7 +37,7 @@ int test_buffer() {
 
     generate_entropy(out1, max);
 
-    BUFFER_MOVE(p, buf->pos, sizeof(out1));
+    p = split_chain_buffer(buf, sizeof(out1));
     memcpy(p, out1, sizeof(out1));
 
     max = rand() % 4049;
@@ -45,11 +45,10 @@ int test_buffer() {
 
     generate_entropy(out2, max);
 
-    BUFFER_MOVE(p, buf->pos, sizeof(out2));
+    p = split_chain_buffer(buf, sizeof(out2));
     memcpy(p, out2, sizeof(out2));
 
     destroy_regions(r);
-    free(buf);
     return 0;
 }
 

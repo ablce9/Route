@@ -15,30 +15,24 @@ static void format_string(char *string, size_t size, char *fmt, ...);
 const char *weeks[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-static __map_t *parse_http_request_meta_header_line(char *line_buf, __map_t *map, __buffer_t *chain_buf) {
+static __map_t *parse_http_request_meta_header_line(char *line_buf, size_t line_size, __map_t *map, __buffer_t *chain_buf) {
     char ch, *p, *key_buf, *val_buf;
     size_t key_size = 0;
 
-    for (p = line_buf; ; key_size++, p++) {
+    for (p = line_buf; key_size < line_size; key_size++, p++) {
 
 	ch = *p;
 
 	if (ch == ':') {
-	    char key[key_size];
 
-	    memcpy(key, line_buf, key_size);
-	    key[key_size] = '\0';
-
-	    BUFFER_MOVE(key_buf, chain_buf->pos, key_size);
-	    memcpy(key_buf, key, key_size);
+	    key_buf = split_chain_buffer(chain_buf, key_size);
 	    map->key = key_buf;
 
 	    break;
 	}
     }
 
-    // TODO: add line length as param
-    BUFFER_MOVE(val_buf, chain_buf->pos, strnlen(line_buf, 1024) - key_size);
+    val_buf = split_chain_buffer(chain_buf, line_size - key_size);
     val_buf = line_buf + key_size + 2;
     map->value = (void *)val_buf;
 
@@ -104,9 +98,7 @@ http_header_t *new_http_request_header(region_t *r) {
     header = (http_header_t *)new_region->data;
 
     header->r = new_region;
-    header->start = NULL;
     header->method = 0;
-    header->start_size = 0;
 
     return header;
 }
@@ -284,23 +276,16 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 	}
     }
 
-    BUFFER_MOVE(header->start, chain_buf->pos, line_length);
-
-    header->start_size = line_length;
-
-    if (!header->start) {
-	goto error;
-    }
-
-    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE); // reset
+    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
     state = start;
+
+    char *rest, *rest_end;
+    rest = reqb->pos;
+    rest += line_length;
+    rest_end = rest + sizeof(char *) * line_length;
+
     line_length = 0;
-
-    __buffer_t header_rest;
-    header_rest.pos = reqb->pos + header->start_size;
-    header_rest.end = reqb->pos + (sizeof(char *) * header->start_size);
-
-    for (p = header_rest.pos; p < header_rest.end; ++p) {
+    for (p = rest; p < rest_end; ++p) {
 
 	ch = *p;
 
@@ -315,12 +300,12 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
 		char *line_buf;
 
-		BUFFER_MOVE(line_buf, chain_buf->pos, line_length);
+		line_buf = split_chain_buffer(chain_buf, line_length);
+
 		memcpy(line_buf, line, line_length);
-		line_buf[line_length] = '\0';
 
 		map = make_map(maps);
-		map = parse_http_request_meta_header_line(line_buf, map, chain_buf);
+		map = parse_http_request_meta_header_line(line_buf, line_length, map, chain_buf);
 
 		if (map != NULL) {
 		    header->meta[map_index] = map;
@@ -328,7 +313,7 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 		}
 	    };
 
-	    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE); // reset
+	    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
 	    line_length = 0;
 	    state = done;
 	    break;
