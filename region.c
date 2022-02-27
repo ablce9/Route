@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+
 #include "region.h"
 
 region_t *create_region() {
@@ -15,10 +17,10 @@ region_t *create_region() {
     max_regions_size = 16 * 1024;
 
     r->cleanup = NULL;
-    r->max = max_regions_size;
+    r->max     = max_regions_size;
     r->current = r;
-    r->next = NULL;
-    r->data = NULL;
+    r->next    = NULL;
+    r->data    = NULL;
 
     return r;
 }
@@ -29,6 +31,7 @@ void destroy_regions(region_t *r) {
     current = r->current;
 
     p = current->next;
+
     while (p) {
 	tmp = p;
 	p = p->next;
@@ -43,6 +46,10 @@ void destroy_regions(region_t *r) {
     free(current);
 }
 
+#define ALIGNMENT sizeof(unsigned long)
+#define align_ptr(p, a)							\
+    (u_char *) (((uintptr_t) (p) + ((uintptr_t) a - 1)) & ~((uintptr_t) a - 1))
+
 region_t *ralloc(region_t *r, size_t region_size) {
     void     *m;
     size_t   base_size;
@@ -54,15 +61,15 @@ region_t *ralloc(region_t *r, size_t region_size) {
 	return NULL;
     }
 
-    memset(m, 0, base_size);
-
     new_region = (region_t *)m;
-    m += sizeof(region_t);
 
-    new_region->next = NULL;
+    m += sizeof(region_t);
+    m = align_ptr(m, ALIGNMENT);
+
+    new_region->next    = NULL;
     new_region->current = r->current;
     new_region->cleanup = NULL;
-    new_region->data = m;
+    new_region->data    = m;
 
     r->next = new_region;
 
