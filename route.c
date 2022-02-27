@@ -20,13 +20,11 @@ typedef struct {
 static uv_loop_t *loop;
 
 static void close_cb(uv_handle_t* handle) {
-    region_t          *r;
     request_context_t *ctx;
 
     ctx = (request_context_t *)handle->data;
-    r = (region_t *)ctx->r;
 
-    destroy_regions(r);
+    destroy_regions(ctx->r);
     free(handle);
 }
 
@@ -63,19 +61,26 @@ static void write_cb(uv_write_t *request, int status) {
     if (status < 0) {
 	fprintf(stderr, "write error %i\n", status);
     }
-
-    free(request);
 }
 
 static void invalid_request_close_cb(uv_handle_t* handle) {
     request_context_t *ctx;
-    region_t *r;
 
     ctx = (request_context_t *)handle->data;
-    r = (region_t *)ctx->r;
 
-    destroy_regions(r);
+    destroy_regions(ctx->r);
     free(handle);
+}
+
+static region_t *make_response_writer(region_t *r) {
+    region_t   *new_region;
+
+    new_region = ralloc(r, sizeof(uv_write_t));
+    if (new_region == NULL) {
+	return NULL;
+    }
+
+    return new_region;
 }
 
 static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_buf) {
@@ -132,7 +137,8 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
 	goto error;
     }
 
-    writer = (uv_write_t*)malloc(sizeof(uv_write_t));
+    r = make_response_writer(r);
+    writer = (uv_write_t*)r->data;
 
     ctx->r = r;
     ctx->rb = chain_buf;
@@ -150,7 +156,7 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     free(request_buf->base);
 }
 
-static request_context_t *make_request_context(region_t *r) {
+static region_t *make_request_context(region_t *r) {
     region_t          *new_region;
     request_context_t *ctx;
 
@@ -161,10 +167,11 @@ static request_context_t *make_request_context(region_t *r) {
 
     ctx = (request_context_t *)new_region->data;
 
-    ctx->r = new_region;
-    ctx->rb = NULL;
+    ctx->r           = new_region;
+    ctx->rb          = NULL;
+    new_region->data = (void *)ctx;
 
-    return ctx;
+    return new_region;
 }
 
 static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
@@ -174,13 +181,16 @@ static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *b
 
     r = create_region();
 
-    rb = create_chain_buffer(r, 1024 * 16);
+    r = create_chain_buffer(r, 1024 * 24);
+    rb = (__buffer_t *)r->data;
 
-    ctx = make_request_context(rb->r);
+    r = make_request_context(r);
+
+    ctx     = r->data;
     ctx->rb = rb;
 
     buf->base = rb->pos;
-    buf->len = suggested_size;
+    buf->len  = suggested_size;
 
     handle->data = (void *)ctx;
 }
