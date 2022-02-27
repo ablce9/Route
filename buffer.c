@@ -33,7 +33,7 @@ static void cleanup(void *p) {
     free(buf->start);
 }
 
-__buffer_t *create_chain_buffer(region_t *r, size_t size) {
+region_t *create_chain_buffer(region_t *r, size_t size) {
     region_t   *new_region;
     __buffer_t *buf;
 
@@ -58,7 +58,9 @@ __buffer_t *create_chain_buffer(region_t *r, size_t size) {
     buf->end        = buf->start + size;
     buf->size       = size;
 
-    return buf;
+    new_region->data = buf;
+
+    return new_region;
 }
 
 char *split_chain_buffer(__buffer_t *src_buf, size_t size) {
