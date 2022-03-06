@@ -12,6 +12,7 @@ region_t *create_region() {
     if (r == NULL) {
 	return NULL;
     }
+
     memset(r, 0, sizeof(region_t));
 
     max_regions_size = 16 * 1024;
@@ -39,7 +40,6 @@ void destroy_regions(region_t *r) {
 	if (tmp->cleanup != NULL) {
 	    tmp->cleanup(tmp);
 	}
-
 	free(tmp);
     };
 

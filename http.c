@@ -13,6 +13,7 @@
 #define CRLF "\r\n"
 
 static void format_string(char *string, size_t size, char *fmt, ...);
+static http_header_t *init_http_request_header(region_t *r);
 
 const char *weeks[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
@@ -23,15 +24,15 @@ static __map_t *parse_http_request_meta_header_line(char *line_buf, size_t line_
 
     for (p = line_buf; key_size < line_size; key_size++, p++) {
 
-	ch = *p;
+        ch = *p;
 
-	if (ch == ':') {
+        if (ch == ':') {
 
-	    key_buf = split_chain_buffer(chain_buf, key_size);
-	    map->key = key_buf;
+            key_buf = split_chain_buffer(chain_buf, key_size);
+            map->key = key_buf;
 
-	    break;
-	}
+            break;
+        }
     }
 
     val_buf = split_chain_buffer(chain_buf, line_size - key_size);
@@ -56,26 +57,28 @@ static char *create_http_time(time_t *t, char *buf) {
     p = gmtime(t);
 
     sprintf(buf, "%s, %02d %s %d %02d:%02d:%02d GMT",
-	    weeks[p->tm_wday],
-	    p->tm_mday,
-	    months[p->tm_mon],
-	    1900 + p->tm_year,
-	    p->tm_hour,
-	    p->tm_min,
-	    p->tm_sec);
+            weeks[p->tm_wday],
+            p->tm_mday,
+            months[p->tm_mon],
+            1900 + p->tm_year,
+            p->tm_hour,
+            p->tm_min,
+            p->tm_sec);
 
     return buf;
 }
 
-char *create_http_response_header(http_header_t *h, char *chain_buf) {
+#define MAX_HTTP_HEADER_SIZE 65536
+
+char *create_http_response_header(http_header_t *h, char *dst_buf) {
     char *fmt =								\
-	"HTTP/1.1 200 OK\r\n"						\
-	"Server: rex\r\n" \
-	"Content-Length: %zu\r\n" \
-	"Date: %s\r\n"				\
-	"Content-Type: text/html; charset=UTF-8\r\n"			\
-	CRLF;
-    char buf[4096], http_time_buf[64];
+        "HTTP/1.1 200 OK\r\n"						\
+        "Server: rex\r\n" \
+        "Content-Length: %zu\r\n" \
+        "Date: %s\r\n"				\
+        "Content-Type: text/html; charset=UTF-8\r\n"			\
+        CRLF;
+    char buf[MAX_HTTP_HEADER_SIZE], http_time_buf[64];
     size_t buf_size = sizeof(buf);
     time_t now;
 
@@ -83,18 +86,68 @@ char *create_http_response_header(http_header_t *h, char *chain_buf) {
 
     create_http_time(&now, http_time_buf);
 
-    format_string(chain_buf, buf_size, fmt, h->size, http_time_buf);
+    format_string(dst_buf, buf_size, fmt, h->size, http_time_buf);
 
-    return chain_buf;
+    return dst_buf;
 }
 
-http_header_t *create_http_request_header(region_t *r) {
+static char *get_http_method(http_header_t *h) {
+    char *m;
+
+    switch (h->method) {
+
+    case HTTP_REQUEST_METHOD_GET:
+
+        m = "GET";
+        break;
+
+    default:
+
+        m = "GET";
+    };
+
+
+    return m;
+}
+
+static char *get_http_version(http_header_t *h) {
+    char *v;
+
+    switch (h->version) {
+
+    default:
+
+        v = "1.1";
+    }
+
+    return v;
+}
+
+char *create_http_request_header_string(http_header_t *h, char *dst_buf) {
+    char *fmt, buf[MAX_HTTP_HEADER_SIZE];
+
+    fmt =
+        /* verb */
+        "%s "					\
+        /* path  */
+        "%s "					\
+        /* version */
+        "HTTP/%s"				\
+        CRLF					\
+        CRLF;
+
+    format_string(dst_buf, sizeof(buf), fmt, get_http_method(h), h->path, get_http_version(h));
+
+    return dst_buf;
+}
+
+static http_header_t *init_http_request_header(region_t *r) {
     region_t      *new_region;
     http_header_t *header;
 
     new_region = ralloc(r, sizeof(http_header_t));
     if (new_region == NULL) {
-	return NULL;
+        return NULL;
     }
 
     header = (http_header_t *)new_region->data;
@@ -113,17 +166,17 @@ http_request_parse_result_t *create_http_request_parse_result(region_t *r) {
 
     new_region = ralloc(r, sizeof(http_request_parse_result_t));
     if (new_region == NULL) {
-	return NULL;
+        return NULL;
     }
 
     request = (http_request_parse_result_t *)new_region->data;
     if (request == NULL) {
-	return NULL;
+        return NULL;
     }
 
-    header = create_http_request_header(new_region);
+    header = init_http_request_header(new_region);
     if (header == NULL) {
-	return NULL;
+        return NULL;
     }
 
     request->header = header;
@@ -136,16 +189,17 @@ static char *parse_path(char *path_and_version, __buffer_t *chain_buf) {
     int  count;
     char ch, *path, *p;
 
-    for (p = path_and_version, count = 0; ch != '\0'; p++, ++count) {
+    for (p = path_and_version, ch = *p, count = 0; ch != '\0'; p++, ++count) {
 
-	ch = *p;
+        ch = *p;
 
-	if (ch == ' ') {
-	    break;
-	}
+        if (ch == ' ') {
+            break;
+        }
     }
 
     path = split_chain_buffer(chain_buf, count);
+
     memcpy(path, path_and_version, count);
 
     return path;
@@ -153,11 +207,11 @@ static char *parse_path(char *path_and_version, __buffer_t *chain_buf) {
 
 static rex_int parse_http_request_start(http_header_t *header, const char *line_buf, __buffer_t *chain_buf) {
     enum {
-	start = 0,
-	method,
-	http_path,
-	http_version,
-	http_path_and_version,
+        start = 0,
+        method,
+        http_path,
+        http_version,
+        http_path_and_version,
     } state;
 
     state = start;
@@ -165,87 +219,87 @@ static rex_int parse_http_request_start(http_header_t *header, const char *line_
     char *p, ch, *request_start, *path, *path_and_version;
     for (p = (char *)line_buf; p < line_buf + sizeof(line_buf); p++) {
 
-	ch = *p;
+        ch = *p;
 
-	switch (state) {
+        switch (state) {
 
-	case start:
-	    request_start = p;
-	    state = method;
-	    break;
+        case start:
+            request_start = p;
+            state = method;
+            break;
 
-	case method:
+        case method:
 
-	    if (ch == ' ') {
+            if (ch == ' ') {
 
-		switch(p - line_buf) {
+                switch(p - line_buf) {
 
-		case 3:
-		    if (str4comp(request_start, 'G', 'E', 'T', ' ')) {
-			header->method = HTTP_REQUEST_METHOD_GET;
-			state = http_path;
-			break;
-		    }
+                case 3:
+                    if (str4comp(request_start, 'G', 'E', 'T', ' ')) {
+                        header->method = HTTP_REQUEST_METHOD_GET;
+                        state = http_path;
+                        break;
+                    }
 
-		    if (str4comp(request_start, 'P', 'U', 'T', ' ')) {
-			header->method = HTTP_REQUEST_METHOD_PUT;
-			state = http_path;
-			break;
-		    }
+                    if (str4comp(request_start, 'P', 'U', 'T', ' ')) {
+                        header->method = HTTP_REQUEST_METHOD_PUT;
+                        state = http_path;
+                        break;
+                    }
 
-		    goto error;
+                    goto error;
 
-		case 4:
-		    if (str4comp(request_start, 'P', 'O', 'S', 'T')) {
-			header->method = HTTP_REQUEST_METHOD_POST;
-			state = http_path;
-			break;
-		    }
+                case 4:
+                    if (str4comp(request_start, 'P', 'O', 'S', 'T')) {
+                        header->method = HTTP_REQUEST_METHOD_POST;
+                        state = http_path;
+                        break;
+                    }
 
-		    if (str4comp(request_start, 'H', 'E', 'A', 'D')) {
-			header->method = HTTP_REQUEST_METHOD_POST;
-			state = http_path;
-			break;
-		    }
+                    if (str4comp(request_start, 'H', 'E', 'A', 'D')) {
+                        header->method = HTTP_REQUEST_METHOD_POST;
+                        state = http_path;
+                        break;
+                    }
 
-		    goto error;
+                    goto error;
 
-		case 5:
-		    if (str5comp(request_start, 'P', 'A', 'T', 'C', 'H')) {
-			header->method = HTTP_REQUEST_METHOD_PATCH;
-			state = http_path;
-			break;
-		    }
+                case 5:
+                    if (str5comp(request_start, 'P', 'A', 'T', 'C', 'H')) {
+                        header->method = HTTP_REQUEST_METHOD_PATCH;
+                        state = http_path;
+                        break;
+                    }
 
-		default:
-		    goto error;
+                default:
+                    goto error;
 
-		}
-	    } else { /* todo */ }
+                }
+            } else { /* todo */ }
 
-	    break;
+            break;
 
-	case http_path:
+        case http_path:
 
-	    path_and_version = request_start + (p - line_buf);
-	    path = parse_path(path_and_version, chain_buf);
-	    header->path = path;
+            path_and_version = request_start + (p - line_buf);
+            path = parse_path(path_and_version, chain_buf);
+            header->path = path;
 
-	    state = http_version;
+            state = http_version;
 
-	    break;
+            break;
 
-	case http_version:
-	    break;
+        case http_version:
+            break;
 
-	default:
-	    goto error;
+        default:
+            goto error;
 
-	}
+        }
     }
 
     if (header->method == 0) {
-	goto error;
+        goto error;
     }
 
     return REX_OK;
@@ -263,9 +317,9 @@ static rex_int parse_http_request_start(http_header_t *header, const char *line_
 rex_int
 parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_buf, __map_t *maps) {
     enum {
-	start = 0,
-	almost_done,
-	done
+        start = 0,
+        almost_done,
+        done
     } state;
 
     char line[MAX_HTTP_HEADER_LINE_BUFFER_SIZE], ch, *p;
@@ -274,46 +328,44 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
     __map_t *map;
 
     state = start;
-    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
 
     for (p = reqb->pos; p < reqb->end; p++) {
 
-	ch = *p;
+        ch = *p;
 
-	switch (ch) {
+        switch (ch) {
 
-	case CR:
-	    state = almost_done;
-	    break;
+        case CR:
+            state = almost_done;
+            break;
 
-	case LF:
-	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
+        case LF:
+            if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE) {
 
-		line[line_length] = '\0';
+                line[line_length] = '\0';
 
-		parsed_status = parse_http_request_start(header, line, chain_buf);
+                parsed_status = parse_http_request_start(header, line, chain_buf);
 
-		if (parsed_status != REX_OK) {
-		    goto error;
-		}
+                if (parsed_status != REX_OK) {
+                    goto error;
+                }
 
-		state = done;
-	    } else { /* TODO */ }
+                state = done;
+            } else { /* TODO */ }
 
-	    break;
+            break;
 
-	default:
-	    line[line_length] = ch;
-	    ++line_length;
+        default:
+            line[line_length] = ch;
+            ++line_length;
 
-	}
+        }
 
-	if (state == done) {
-	    break;
-	}
+        if (state == done) {
+            break;
+        }
     }
 
-    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
     state = start;
 
     char *rest, *rest_end;
@@ -324,42 +376,42 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
     line_length = 0;
     for (p = rest; p < rest_end; ++p) {
 
-	ch = *p;
+        ch = *p;
 
-	switch (ch) {
+        switch (ch) {
 
-	case CR:
-	    state = almost_done;
-	    break;
+        case CR:
+            state = almost_done;
+            break;
 
-	case LF:
-	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE && line_length > 0) {
+        case LF:
+            if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE && line_length > 0) {
 
-		char *line_buf;
+                char *line_buf;
 
-		line_buf = split_chain_buffer(chain_buf, line_length);
+                line_buf = split_chain_buffer(chain_buf, line_length);
 
-		memcpy(line_buf, line, line_length);
+                memcpy(line_buf, line, line_length);
 
-		map = make_map(maps);
-		map = parse_http_request_meta_header_line(line_buf, line_length, map, chain_buf);
+                map = make_map(maps);
+                map = parse_http_request_meta_header_line(line_buf, line_length, map, chain_buf);
 
-		if (map != NULL) {
-		    header->meta[map_index] = map;
-		    ++map_index;
-		}
-	    } else { /* TODO */ }
+                if (map != NULL) {
+                    header->meta[map_index] = map;
+                    ++map_index;
+                }
+            } else { /* TODO */ }
 
-	    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
-	    line_length = 0;
-	    state = done;
-	    break;
+            memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
+            line_length = 0;
+            state = done;
+            break;
 
-	default:
-	    line[line_length] = ch;
-	    ++line_length;
+        default:
+            line[line_length] = ch;
+            ++line_length;
 
-	}
+        }
     }
 
     return REX_OK;

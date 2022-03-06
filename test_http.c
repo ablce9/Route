@@ -44,14 +44,14 @@ static int test_parse_http_request() {
 }
 
 static int test_make_http_header() {
-    __buffer_t *buf;
-    region_t *r;
-    char *header1, *header2, *header3;
+    char          *buf, *header1, *header2, *header3;
+    region_t      *r;
     http_header_t h;
 
     r = create_region();
 
-    buf = create_chain_buffer(r, sizeof(char *) * 5000 * 3);
+    r = create_chain_buffer(r, 5000);
+    buf = ((__buffer_t *)r->data)->pos;
 
     h.size = 1;
     header1 = create_http_response_header(&h, buf);
@@ -68,6 +68,31 @@ static int test_make_http_header() {
     return 0;
 }
 
+static int test_create_http_request_header_string() {
+    char       *buf;
+    region_t   *r;
+
+    r = create_region();
+
+    r = create_chain_buffer(r, 5000);
+    buf = ((__buffer_t *)r->data)->pos;
+
+    http_header_t h = {
+	.path = "/index.html",
+	.size = 0,
+	.method = HTTP_REQUEST_METHOD_GET,
+	.version = 0
+    };
+
+    buf = create_http_request_header_string(&h, buf);
+
+    printf("%s", buf);
+
+    destroy_regions(r);
+
+    return 0;
+}
+
 int main() {
     /* todo: free memory */
     test_parse_http_request();
@@ -78,7 +103,10 @@ int main() {
     t = time(&t);
     char http_time[1024];
     memset(http_time, 0, sizeof(http_time));
-    make_http_time(&t, http_time);
-    printf("%s\n", http_time);
+
+    printf("%s", http_time);
+
+    test_create_http_request_header_string();
+
     return 0;
 }
