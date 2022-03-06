@@ -31,9 +31,9 @@ static int test_parse_http_request() {
     reqb.pos = raw_header;
     reqb.end = reqb.pos + sizeof(raw_header) * sizeof(char *);
 
-    route_int result = parse_http_request(request_header, &reqb, chain_buf, map);
+    rex_int result = parse_http_request(request_header, &reqb, chain_buf, map);
 
-    assert(result == ROUTE_OK);
+    assert(result == REX_OK);
     assert(request_header->method == HTTP_REQUEST_METHOD_GET);
     // assert(strncmp(request_header->meta[0]->key->bytes, (char*)"Host", 4) == 0);
     // assert(strncmp(request_header->meta[1]->key->bytes, (char*)"User-Agent: curl/7.74.0", 10) == 0);

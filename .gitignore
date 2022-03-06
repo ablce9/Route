@@ -1,5 +1,5 @@
 *.o
 *.so
-route
+rex
 test_buffer
 test_http

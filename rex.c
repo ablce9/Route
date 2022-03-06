@@ -89,7 +89,7 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
     __map_t                    *map;
     region_t                   *r;
     uv_buf_t                   response_vec[2];
-    route_int                  parsed_status;
+    rex_int                  parsed_status;
     __buffer_t                 *chain_buf, reqb;
     uv_write_t                 *writer;
     http_header_t              header;
@@ -133,7 +133,7 @@ static void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* request_
 
     parsed_status = parse_http_request(request_payload->header, &reqb, chain_buf, map);
 
-    if (parsed_status != ROUTE_OK) {
+    if (parsed_status != REX_OK) {
 	goto error;
     }
 
