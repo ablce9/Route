@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdio.h>
+
 #include <time.h>
 
 #include "./http.h"
@@ -48,7 +50,7 @@ static void format_string(char *string, size_t size, char *fmt, ...)
    va_end(arg_ptr);
 }
 
-static char *make_http_time(time_t *t, char *buf) {
+static char *create_http_time(time_t *t, char *buf) {
     struct tm *p;
 
     p = gmtime(t);
@@ -65,7 +67,7 @@ static char *make_http_time(time_t *t, char *buf) {
     return buf;
 }
 
-char *make_http_response_header(http_header_t *h, char *chain_buf) {
+char *create_http_response_header(http_header_t *h, char *chain_buf) {
     char *fmt =								\
 	"HTTP/1.1 200 OK\r\n"						\
 	"Server: route\r\n" \
@@ -79,14 +81,14 @@ char *make_http_response_header(http_header_t *h, char *chain_buf) {
 
     now = time(&now);
 
-    make_http_time(&now, http_time_buf);
+    create_http_time(&now, http_time_buf);
 
     format_string(chain_buf, buf_size, fmt, h->size, http_time_buf);
 
     return chain_buf;
 }
 
-http_header_t *new_http_request_header(region_t *r) {
+http_header_t *create_http_request_header(region_t *r) {
     region_t      *new_region;
     http_header_t *header;
 
@@ -97,28 +99,29 @@ http_header_t *new_http_request_header(region_t *r) {
 
     header = (http_header_t *)new_region->data;
 
-    header->r = new_region;
+    header->r      = new_region;
     header->method = 0;
+    header->path   = NULL;
 
     return header;
 }
 
-http_request_payload_t *new_http_request_payload(region_t *r) {
-    region_t               *new_region;
-    http_header_t          *header;
-    http_request_payload_t *request;
+http_request_parse_result_t *create_http_request_parse_result(region_t *r) {
+    region_t                    *new_region;
+    http_header_t               *header;
+    http_request_parse_result_t *request;
 
-    new_region = ralloc(r, sizeof(http_request_payload_t));
+    new_region = ralloc(r, sizeof(http_request_parse_result_t));
     if (new_region == NULL) {
 	return NULL;
     }
 
-    request = (http_request_payload_t *)new_region->data;
+    request = (http_request_parse_result_t *)new_region->data;
     if (request == NULL) {
 	return NULL;
     }
 
-    header = new_http_request_header(new_region);
+    header = create_http_request_header(new_region);
     if (header == NULL) {
 	return NULL;
     }
@@ -129,17 +132,38 @@ http_request_payload_t *new_http_request_payload(region_t *r) {
     return request;
 }
 
-route_int
-parse_http_request_start(http_header_t *header, const char *line_buf) {
+static char *parse_path(char *path_and_version, __buffer_t *chain_buf) {
+    int  count;
+    char ch, *path, *p;
+
+    for (p = path_and_version, count = 0; ch != '\0'; p++, ++count) {
+
+	ch = *p;
+
+	if (ch == ' ') {
+	    break;
+	}
+    }
+
+    path = split_chain_buffer(chain_buf, count);
+    memcpy(path, path_and_version, count);
+
+    return path;
+}
+
+static route_int
+parse_http_request_start(http_header_t *header, const char *line_buf, __buffer_t *chain_buf) {
     enum {
 	start = 0,
 	method,
-	http_path
+	http_path,
+	http_version,
+	http_path_and_version,
     } state;
 
     state = start;
 
-    char *p, ch, *request_start;
+    char *p, ch, *request_start, *path, *path_and_version;
     for (p = (char *)line_buf; p < line_buf + sizeof(line_buf); p++) {
 
 	ch = *p;
@@ -152,6 +176,7 @@ parse_http_request_start(http_header_t *header, const char *line_buf) {
 	    break;
 
 	case method:
+
 	    if (ch == ' ') {
 
 		switch(p - line_buf) {
@@ -197,9 +222,21 @@ parse_http_request_start(http_header_t *header, const char *line_buf) {
 		    goto error;
 
 		}
-	    }
+	    } else { /* todo */ }
+
+	    break;
 
 	case http_path:
+
+	    path_and_version = request_start + (p - line_buf);
+	    path = parse_path(path_and_version, chain_buf);
+	    header->path = path;
+
+	    state = http_version;
+
+	    break;
+
+	case http_version:
 	    break;
 
 	default:
@@ -255,14 +292,15 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
 		line[line_length] = '\0';
 
-		parsed_status = parse_http_request_start(header, line);
+		parsed_status = parse_http_request_start(header, line, chain_buf);
 
 		if (parsed_status != ROUTE_OK) {
 		    goto error;
 		}
 
 		state = done;
-	    }
+	    } else { /* TODO */ }
+
 	    break;
 
 	default:
@@ -311,7 +349,7 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 		    header->meta[map_index] = map;
 		    ++map_index;
 		}
-	    };
+	    } else { /* TODO */ }
 
 	    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);
 	    line_length = 0;

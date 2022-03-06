@@ -54,13 +54,13 @@ static int test_make_http_header() {
     buf = create_chain_buffer(r, sizeof(char *) * 5000 * 3);
 
     h.size = 1;
-    header1 = make_http_response_header(&h, buf);
+    header1 = create_http_response_header(&h, buf);
 
     h.size = 2;
-    header2 = make_http_response_header(&h, buf);
+    header2 = create_http_response_header(&h, buf);
 
     h.size = 3;
-    header3 = make_http_response_header(&h, buf);
+    header3 = create_http_response_header(&h, buf);
 
     printf("%s%s%s", header1, header2, header3);
 
