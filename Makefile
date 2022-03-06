@@ -1,9 +1,9 @@
-OBJS := buffer.o map.o http.o region.o route.o
+OBJS := buffer.o map.o http.o region.o rex.o
 TEST_OBJS := buffer.o map.o http.o region.o
 CFLAGS := -luv -Wall -g3 -ggdb -O0
-all: route
+all: rex
 
-route: $(OBJS)
+rex: $(OBJS)
 	$(CC) -o $@ $(OBJS) $(CFLAGS)
 
 test_buffer: test_buffer.o $(TEST_OBJS)
@@ -19,4 +19,4 @@ test_region: test_region.o $(OBJS)
 	$(CC) -c $(CFLAGS) $< -o $@
 
 clean:
-	@ rm -v $(OBJS) route
+	@ rm -v $(OBJS) rex

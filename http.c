@@ -70,7 +70,7 @@ static char *create_http_time(time_t *t, char *buf) {
 char *create_http_response_header(http_header_t *h, char *chain_buf) {
     char *fmt =								\
 	"HTTP/1.1 200 OK\r\n"						\
-	"Server: route\r\n" \
+	"Server: rex\r\n" \
 	"Content-Length: %zu\r\n" \
 	"Date: %s\r\n"				\
 	"Content-Type: text/html; charset=UTF-8\r\n"			\
@@ -151,8 +151,7 @@ static char *parse_path(char *path_and_version, __buffer_t *chain_buf) {
     return path;
 }
 
-static route_int
-parse_http_request_start(http_header_t *header, const char *line_buf, __buffer_t *chain_buf) {
+static rex_int parse_http_request_start(http_header_t *header, const char *line_buf, __buffer_t *chain_buf) {
     enum {
 	start = 0,
 	method,
@@ -249,10 +248,10 @@ parse_http_request_start(http_header_t *header, const char *line_buf, __buffer_t
 	goto error;
     }
 
-    return ROUTE_OK;
+    return REX_OK;
 
  error:
-    return ROUTE_ERROR;
+    return REX_ERROR;
 }
 
 
@@ -261,7 +260,7 @@ parse_http_request_start(http_header_t *header, const char *line_buf, __buffer_t
 #define LF '\n'
 #define CR '\r'
 
-route_int
+rex_int
 parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_buf, __map_t *maps) {
     enum {
 	start = 0,
@@ -271,7 +270,7 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
     char line[MAX_HTTP_HEADER_LINE_BUFFER_SIZE], ch, *p;
     int line_length = 0, map_index = 0;
-    route_int parsed_status;
+    rex_int parsed_status;
     __map_t *map;
 
     state = start;
@@ -294,7 +293,7 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
 		parsed_status = parse_http_request_start(header, line, chain_buf);
 
-		if (parsed_status != ROUTE_OK) {
+		if (parsed_status != REX_OK) {
 		    goto error;
 		}
 
@@ -363,8 +362,8 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 	}
     }
 
-    return ROUTE_OK;
+    return REX_OK;
 
  error:
-    return ROUTE_ERROR;
+    return REX_ERROR;
 }

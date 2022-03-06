@@ -103,7 +103,7 @@ static void handle_request(uv_stream_t* handle, ssize_t nread, const uv_buf_t* r
     __map_t                    *map;
     region_t                   *r;
     uv_buf_t                   response_vec[2];
-    route_int                  parsed_status;
+    rex_int                  parsed_status;
     __buffer_t                 *chain_buf, reqb;
     uv_write_t                 *writer;
     http_header_t              header;
@@ -148,7 +148,7 @@ static void handle_request(uv_stream_t* handle, ssize_t nread, const uv_buf_t* r
     parsed_status = parse_http_request(http_request_parse_result->header, &reqb, chain_buf, map);
     printf("path: %s;\n", http_request_parse_result->header->path);
 
-    if (parsed_status != ROUTE_OK) {
+    if (parsed_status != REX_OK) {
 	goto error;
     }
 
