@@ -46,7 +46,7 @@ typedef struct {
 
 static void write_cb(uv_write_t *request, int status);
 static void close_cb(uv_handle_t* handle);
-static void p_close_cb(uv_handle_t* handle);
+static void close_proxy_connection_cb(uv_handle_t* handle);
 
 static region_t *init_connection(region_t *r, connection_t *c) {
     uv_tcp_t            *uv_socket;
@@ -100,7 +100,7 @@ static void proxy_read_handler(uv_stream_t *handle, ssize_t read_count, const uv
     proxy_handle->data = (void *)ctx;
 
     if (read_count == UV_EOF && uv_is_closing((uv_handle_t *)handle) == 0) {
-      uv_close((uv_handle_t *)handle, p_close_cb);
+      uv_close((uv_handle_t *)handle, close_proxy_connection_cb);
       return;
     }
 
@@ -131,12 +131,12 @@ static void proxy_connection_handler(uv_connect_t *c, int status) {
     uv_write_t        *writer;
     request_context_t *ctx;
 
+    ctx = (request_context_t *)c->data;
+
     if (status < 0) {
 	printf("connection error: %s\n", uv_strerror(status));
-	return;
+	goto error;
     }
-
-    ctx = (request_context_t *)c->data;
 
     r = ctx->r;
     r = make_response_writer(r);
@@ -157,6 +157,10 @@ static void proxy_connection_handler(uv_connect_t *c, int status) {
 	printf("[error] proxy read %s\n", uv_strerror(read_status));
     }
 
+    return;
+
+ error:
+      uv_close((uv_handle_t *)ctx->uv_stream, close_cb);
 }
 
 static void close_cb(uv_handle_t* handle) {
@@ -167,7 +171,7 @@ static void close_cb(uv_handle_t* handle) {
   destroy_regions(ctx->r);
 }
 
-static void p_close_cb(uv_handle_t* handle) {
+static void close_proxy_connection_cb(uv_handle_t* handle) {
     request_context_t *ctx;
 
     ctx = (request_context_t *)handle->data;
@@ -231,7 +235,7 @@ static void handle_request(uv_stream_t *handle, ssize_t nread, const uv_buf_t *r
 
     if (nread < 0) {
 	printf("invalid request, closing a connection\n");
-	uv_close((uv_handle_t*)handle, p_close_cb);
+	uv_close((uv_handle_t*)handle, close_proxy_connection_cb);
 	return;
     }
 
@@ -284,7 +288,7 @@ static void handle_request(uv_stream_t *handle, ssize_t nread, const uv_buf_t *r
     handle->data = (void *)ctx;
     c.uv_con->data = (void *)ctx;
 
-    uv_ip4_addr("127.0.0.1", 8000, &dest_address);
+    uv_ip4_addr("127.0.0.1", 80, &dest_address);
     connection_status = uv_tcp_connect(
 				       c.uv_con,
 				       c.uv_socket,
@@ -294,14 +298,14 @@ static void handle_request(uv_stream_t *handle, ssize_t nread, const uv_buf_t *r
 
     if (connection_status < 0) {
 	printf("connection error: %s\n", uv_strerror(connection_status));
-	uv_close((uv_handle_t *)handle, p_close_cb);
+	uv_close((uv_handle_t *)handle, close_proxy_connection_cb);
     }
 
     return;
 
  error:
     printf("[debug] invalid requests. closing connection.\n");
-    uv_close((uv_handle_t*)handle, p_close_cb);
+    uv_close((uv_handle_t*)handle, close_proxy_connection_cb);
 }
 
 static region_t *make_request_context(region_t *r) {
@@ -333,7 +337,7 @@ static void proxy_request_handler(uv_stream_t* stream, ssize_t buffer_size, cons
 
     if (buffer_size < 0) {
 	printf("error occurred on proxy_request_handler\n");
-	uv_close((uv_handle_t*)stream, p_close_cb);
+	uv_close((uv_handle_t*)stream, close_proxy_connection_cb);
 	return;
     }
 
