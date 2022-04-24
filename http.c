@@ -125,7 +125,7 @@ char *create_http_request_header_string(http_header_t *h, char *dst_buf) {
 	CRLF					\
 	CRLF;
 
-    format_string(dst_buf, sizeof(buf), fmt, get_http_method(h), h->path, h->host);
+    format_string(dst_buf, sizeof(buf), fmt, get_http_method(h), h->path, "localhost");
 
     return dst_buf;
 }
