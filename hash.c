@@ -4,9 +4,9 @@
 #include "hash.h"
 #include "region.h"
 
-static void cleanup(void *p) {
-    void           *tmp;
-    __hash_entry_t **buckets;
+static void cleanup_buckets(void *p) {
+    void             *tmp;
+    rex_hash_entry_t **buckets;
 
     tmp = p;
     tmp += sizeof(region_t);
@@ -16,9 +16,20 @@ static void cleanup(void *p) {
     free(buckets);
 }
 
+static void cleanup_bucket_size(void *p) {
+    void             *tmp;
+    rex_hash_entry_t *bucket;
+
+    tmp = p;
+    tmp += sizeof(region_t);
+
+    bucket = ((rex_hash_entry_t *)tmp);
+    free(bucket->current_bucket_size);
+}
+
 region_t *init_hash_table(region_t *r) {
-    size_t         table_size;
-    region_t       *new_region;
+    size_t           table_size;
+    region_t         *new_region;
     rex_hash_table_t *table;
 
     new_region = ralloc(r, sizeof(rex_hash_table_t));
@@ -32,32 +43,66 @@ region_t *init_hash_table(region_t *r) {
 
     table_size = 255;
 
-    table->buckets = calloc(sizeof(__hash_entry_t), table_size);
+    table->buckets = calloc(sizeof(rex_hash_entry_t *), table_size);
 
     if (table->buckets == NULL) {
 	return NULL;
     }
 
-    new_region->cleanup = cleanup;
+    new_region->cleanup = cleanup_buckets;
     new_region->data = table;
 
     return new_region;
 }
 
+#ifndef MAX_BUCKETS_SIZE
+#define MAX_BUCKETS_SIZE 255
+#endif
+
+#ifndef INITIAL_BUCKET_SIZE
+#define INITIAL_BUCKET_SIZE 255
+#endif
 rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, uint8_t key_size) {
-    uint8_t           hash, entry_size;
-    region_t          *new_region;
-    __hash_entry_t    *bucket, *head, *entry;
+    void             *m;
+    size_t           buckets_size, current_max_bucket_size, *current_bucket_size;
+    uint8_t          hash;
+    region_t         *new_region;
+    rex_hash_entry_t *bucket, *head, *entry;
 
     hash = compute_hash_key(key, key_size);
-    entry_size = 255;
-    hash = hash % entry_size;
+    buckets_size = MAX_BUCKETS_SIZE;
+    hash = hash % buckets_size;
 
     bucket = table->buckets[hash];
 
-    if (bucket == NULL) {
-	new_region = ralloc(table->r, sizeof(__hash_entry_t) * entry_size);
+    if (bucket) {
+	head = bucket;
+	current_bucket_size = bucket->current_bucket_size;
+	current_max_bucket_size = bucket->max_bucket_size;
+
+	*bucket->current_bucket_size += 1;
+	if (bucket->max_bucket_size < *bucket->current_bucket_size) {
+	    m = realloc((void *)bucket, sizeof(rex_hash_entry_t) * 255);
+	    bucket = (rex_hash_entry_t *)m;
+	}
+
+	entry = ++bucket;
+
+	entry->current_bucket_size = current_bucket_size;
+	entry->key = key;
+	entry->value = value;
+	entry->next = NULL;
+	entry->prev = head;
+	entry->max_bucket_size = current_max_bucket_size;
+    } else {
+	new_region = ralloc(table->r, sizeof(rex_hash_entry_t) * (size_t)INITIAL_BUCKET_SIZE);
+	new_region->cleanup = cleanup_bucket_size;
+
 	table->buckets[hash] = new_region->data;
+
+	table->buckets[hash]->current_bucket_size = malloc(sizeof(size_t));
+	*table->buckets[hash]->current_bucket_size = 0;
+	table->buckets[hash]->max_bucket_size = (size_t)INITIAL_BUCKET_SIZE;
 
 	entry = table->buckets[hash];
 
@@ -66,17 +111,7 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
 
 	table->buckets[hash]->next = NULL;
 	table->buckets[hash]->prev = NULL;
-
 	table->r = new_region;
-
-    } else {
-	head = bucket;
-	entry = ++bucket;
-
-	entry->key = key;
-	entry->value = value;
-	entry->next = NULL;
-	entry->prev = head;
     }
 
     table->buckets[hash] = entry;
@@ -84,9 +119,9 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
     return table;
 }
 
-__hash_entry_t *find_hash_entry(rex_hash_table_t *table, char *key, size_t key_size) {
-    uint8_t        hash, entry_size;
-    __hash_entry_t *bucket, *p;
+rex_hash_entry_t *find_hash_entry(rex_hash_table_t *table, char *key, size_t key_size) {
+    uint8_t          hash, entry_size;
+    rex_hash_entry_t *bucket, *p;
 
     hash = compute_hash_key(key, key_size);
     entry_size = 255;
@@ -111,8 +146,7 @@ __hash_entry_t *find_hash_entry(rex_hash_table_t *table, char *key, size_t key_s
     return NULL;
 }
 
-
-size_t compute_hash_key(char *data, uint8_t size) {
+size_t compute_hash_key(const char *data, const uint8_t size) {
     size_t key, i;
 
     key = 0;

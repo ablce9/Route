@@ -11,18 +11,17 @@
 int main() {
     region_t       *r;
     rex_hash_table_t *table;
-    __hash_entry_t *entry;
+    rex_hash_entry_t *entry;
 
     r = create_region();
     r = init_hash_table(r);
 
     table = (rex_hash_table_t *)r->data;
 
-    table = hash_insert(table, "host", "google.com", 4);
-    r = table->r;
-
-    table = hash_insert(table, "referer", "https://google.com/", 4);
-    r = table->r;
+    hash_insert(table, "host", "google.com", 4);
+    hash_insert(table, "host", "fuga", 4);
+    hash_insert(table, "host", "okay", 4);
+    hash_insert(table, "referer", "https://google.com/", 4);
 
     entry = find_hash_entry(table, "host", 4);
     printf("value=%s\n", entry->value);
