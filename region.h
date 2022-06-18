@@ -17,5 +17,6 @@ region_t *create_region();
 region_t *ralloc(region_t *r, size_t region_size);
 void destroy_regions(region_t *r);
 void* alloc_from_region(region_t *region, size_t size);
+region_t *reallocate_region(region_t *r, size_t region_size, size_t offset);
 
 #endif // __REGION_H

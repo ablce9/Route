@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "region.h"
 
@@ -66,14 +67,28 @@ region_t *ralloc(region_t *r, size_t region_size) {
     m += sizeof(region_t);
     m = align_ptr(m, ALIGNMENT);
 
-    new_region->next    = NULL;
+    new_region->next = NULL;
     new_region->current = r->current;
     new_region->cleanup = NULL;
-    new_region->data    = m;
-
+    new_region->data = m;
     r->next = new_region;
 
     return new_region;
+}
+
+region_t *reallocate_region(region_t *r, size_t region_size, size_t offset) {
+    void *m;
+    size_t region_offset_size;
+
+    region_offset_size = region_size + sizeof(region_t);
+    m = realloc(r->data - sizeof(region_t), region_offset_size);
+    if (m == NULL) {
+	return NULL;
+    }
+
+    r->data = m;
+
+    return r;
 }
 
 void* alloc_from_region(region_t *region, size_t size) {
