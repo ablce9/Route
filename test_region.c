@@ -30,29 +30,24 @@ void test_reallocate_region() {
     // given region created with char* data
     region_t *r;
     r = create_region();
-    r = ralloc(r, 10);
+    r = ralloc(r, 11);
     copy_10_digits_string(r->data);
 
     // when new space is allocated for region data
     char *old_addr = r->data;
-    r = reallocate_region(r, 25, 10);
+    r = reallocate_region(r, 25);
 
-    char *new_addr = r->data  + 25;
-
-    // then data must be equal
+    char *new_addr = r->data;
     copy_10_reversed_order_digits_string(new_addr);
 
-    printf("old=%p [%s]\n", old_addr, old_addr);
+    // then data must be equal
     assert(strncmp(old_addr, "0123456789", 10) == 0);
-
-    printf("new=%p [%s]\n", new_addr, new_addr);
     assert(strncmp(new_addr, "9876543210", 10) == 0);
 
-    // TODO: fix segfault
-    //destroy_regions(r);
+    destroy_regions(r);
 }
 
-int main() {
+static void test_ralloc() {
     region_t *r;
     int i, ii;
     time_t t;
@@ -70,12 +65,13 @@ int main() {
 
 	    point->x = rand();
 	    point->y = rand();
-
-	    printf("x=%d, y=%d\n", point->x, point->y);
 	}
     }
 
     destroy_regions(r);
+}
 
+int main() {
+    test_ralloc();
     test_reallocate_region();
 }

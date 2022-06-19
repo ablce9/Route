@@ -89,7 +89,7 @@ region_t *reallocate_region(region_t *r, size_t new_region_size) {
     }
 
     memcpy(new->data, r->data, r->size);
-
+    new->data += r->size;
     return new;
 }
 
