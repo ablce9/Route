@@ -17,7 +17,7 @@ static int test_parse_http_request() {
 	"User-Agent: curl/7.74.0" CRLF \
 	"Accept: */*" CRLF;
     __buffer_t reqb, *chain_buf;
-    __map_t *map;
+    rex_hash_entry_t *hash;
     region_t *r;
 
     r = create_region();
@@ -25,13 +25,13 @@ static int test_parse_http_request() {
 
     chain_buf = (__buffer_t *)r;
 
-    r = init_map(r, 1024);
-    map = (__map_t *)r;
+    r = init_hash(r, 1024);
+    hash = (rex_hash_entry_t *)r;
 
     reqb.pos = raw_header;
     reqb.end = reqb.pos + sizeof(raw_header) * sizeof(char *);
 
-    rex_int result = parse_http_request(request_header, &reqb, chain_buf, map);
+    rex_int result = parse_http_request(request_header, &reqb, chain_buf, hash);
 
     assert(result == REX_OK);
     assert(request_header->method == HTTP_REQUEST_METHOD_GET);

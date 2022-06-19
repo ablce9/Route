@@ -8,7 +8,7 @@
 
 #include "./http.h"
 #include "./buffer.h"
-#include "./map.h"
+#include "./hash.h"
 
 #define CRLF "\r\n"
 
@@ -18,7 +18,7 @@ static http_header_t *init_http_request_header(region_t *r);
 const char *weeks[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-static __map_t *parse_http_request_meta_header_line(char *line_buf, size_t line_size, __map_t *map, __buffer_t *chain_buf) {
+static rex_hash_table_t *parse_http_request_meta_header_line(char *line_buf, size_t line_size, rex_hash_table_t *hash_table, __buffer_t *chain_buf) {
     char ch, *p, *key_buf, *val_buf;
     size_t key_size = 0;
 
@@ -29,17 +29,16 @@ static __map_t *parse_http_request_meta_header_line(char *line_buf, size_t line_
 	if (ch == ':') {
 
 	    key_buf = split_chain_buffer(chain_buf, key_size);
-	    map->key = key_buf;
+	    val_buf = split_chain_buffer(chain_buf, line_size - key_size);
+	    val_buf = line_buf + key_size + 2;
+
+	    hash_table = hash_insert(hash_table, key_buf, val_buf, line_size - key_size);
 
 	    break;
 	}
     }
 
-    val_buf = split_chain_buffer(chain_buf, line_size - key_size);
-    val_buf = line_buf + key_size + 2;
-    map->value = (void *)val_buf;
-
-    return map;
+    return hash_table;
 }
 
 static void format_string(char *string, size_t size, char *fmt, ...)
@@ -304,7 +303,7 @@ static rex_int parse_http_request_start(http_header_t *header, const char *line_
 #define CR '\r'
 
 rex_int
-parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_buf, __map_t *maps) {
+parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_buf, rex_hash_table_t *hash_table) {
     enum {
 	start = 0,
 	almost_done,
@@ -312,9 +311,9 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
     } state;
 
     char line[MAX_HTTP_HEADER_LINE_BUFFER_SIZE], ch, *p;
-    int line_length = 0, map_index = 0;
+    int line_length = 0, hash_index = 0;
     rex_int parsed_status;
-    __map_t *map;
+    rex_hash_entry_t *hash_entry;
 
     state = start;
 
@@ -382,13 +381,9 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
 		memcpy(line_buf, line, line_length);
 
-		map = make_map(maps);
-		map = parse_http_request_meta_header_line(line_buf, line_length, map, chain_buf);
+		hash_table = parse_http_request_meta_header_line(line_buf, line_length, hash_table, chain_buf);
+		header->meta = hash_table;
 
-		if (map != NULL) {
-		    header->meta[map_index] = map;
-		    ++map_index;
-		}
 	    } else { /* TODO */ }
 
 	    memset(line, 0, MAX_HTTP_HEADER_LINE_BUFFER_SIZE);

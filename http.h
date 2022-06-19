@@ -6,7 +6,7 @@
 #include <time.h>
 
 #include "./buffer.h"
-#include "./map.h"
+#include "./hash.h"
 
 #define HTTP_REQUEST_METHOD_GET  0x1
 #define HTTP_REQUEST_METHOD_PUT  0x2
@@ -26,11 +26,11 @@
 typedef intptr_t rex_int;
 
 typedef struct {
-    char      *path;
-    size_t    size;
-    uint8_t   method;
-    uint8_t   version;
-    __map_t   *meta[1024];
+    char             *path;
+    size_t           size;
+    uint8_t          method;
+    uint8_t          version;
+    rex_hash_table_t *meta;
     region_t  *r;
 } http_header_t;
 
@@ -45,7 +45,7 @@ typedef struct {
     // todo: add body
 } http_request_parse_result_t;
 
-rex_int parse_http_request(http_header_t *header, __buffer_t *header_buf, __buffer_t *chain_buf, __map_t *map);
+rex_int parse_http_request(http_header_t *header, __buffer_t *header_buf, __buffer_t *chain_buf, rex_hash_table_t *hash_table);
 http_header_t *new_http_request_header(region_t *r);
 http_request_parse_result_t *create_http_request_parse_result(region_t *r);
 char *create_http_response_header(http_header_t *h, char *chain_buf);

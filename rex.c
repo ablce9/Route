@@ -7,7 +7,7 @@
 #include <uv.h>
 
 #include "./buffer.h"
-#include "./map.h"
+#include "./hash.h"
 #include "./http.h"
 
 #define CRLF "\r\n"
@@ -225,11 +225,12 @@ static void write_cb(uv_write_t *request, int status) {
 static void handle_request(uv_stream_t *handle, ssize_t nread, const uv_buf_t *request_buf) {
     char                           *file_buf, header_buffer[4096];
     size_t                         response_size;
-    __map_t                        *map;
     rex_int                        parsed_status;
     region_t                       *r;
     __buffer_t                     *chain_buf, reqb;
     http_header_t                  header;
+    rex_hash_entry_t               *hash_entry;
+    rex_hash_table_t               *hash_table;
     request_context_t              *ctx;
     http_request_parse_result_t    *http_request_parse_result;
 
@@ -259,8 +260,8 @@ static void handle_request(uv_stream_t *handle, ssize_t nread, const uv_buf_t *r
     // response_vec[1].base = file_buf;
     // response_vec[1].len = response_size;
 
-    map = (__map_t *)init_map(r, 1024);
-    r = map->r;
+    r = init_hash_table(r);
+    hash_table = (rex_hash_table_t *)r->data;
 
     http_request_parse_result = (http_request_parse_result_t *)create_http_request_parse_result(r);
     r = http_request_parse_result->r;
@@ -268,7 +269,7 @@ static void handle_request(uv_stream_t *handle, ssize_t nread, const uv_buf_t *r
     reqb.pos = request_buf->base;
     reqb.end = reqb.pos + (sizeof(char *) * nread);
 
-    parsed_status = parse_http_request(http_request_parse_result->header, &reqb, chain_buf, map);
+    parsed_status = parse_http_request(http_request_parse_result->header, &reqb, chain_buf, hash_table);
 
     if (parsed_status != REX_OK) {
 	goto error;
