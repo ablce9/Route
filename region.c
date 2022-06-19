@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "region.h"
 
@@ -19,10 +20,10 @@ region_t *create_region() {
     max_regions_size = 16 * 1024;
 
     r->cleanup = NULL;
-    r->max     = max_regions_size;
+    r->size = max_regions_size;
     r->current = r;
-    r->next    = NULL;
-    r->data    = NULL;
+    r->next = NULL;
+    r->data = NULL;
 
     return r;
 }
@@ -66,29 +67,30 @@ region_t *ralloc(region_t *r, size_t region_size) {
 
     m += sizeof(region_t);
     m = align_ptr(m, ALIGNMENT);
-
     new_region->next = NULL;
     new_region->current = r->current;
     new_region->cleanup = NULL;
     new_region->data = m;
+    new_region->size = region_size;
+
     r->next = new_region;
 
     return new_region;
 }
 
-region_t *reallocate_region(region_t *r, size_t region_size, size_t offset) {
-    void *m;
-    size_t region_offset_size;
+region_t *reallocate_region(region_t *r, size_t new_region_size) {
+    region_t *new;
 
-    region_offset_size = region_size + sizeof(region_t);
-    m = realloc(r->data - sizeof(region_t), region_offset_size);
-    if (m == NULL) {
+    assert(r->size < new_region_size);
+
+    new = ralloc(r, new_region_size);
+    if (new == NULL) {
 	return NULL;
     }
 
-    r->data = m;
+    memcpy(new->data, r->data, r->size);
 
-    return r;
+    return new;
 }
 
 void* alloc_from_region(region_t *region, size_t size) {
