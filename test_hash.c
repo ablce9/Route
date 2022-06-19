@@ -18,21 +18,21 @@ int main() {
 
     table = (rex_hash_table_t *)r->data;
 
-    hash_insert(table, "host", "google.com", 4);
-    hash_insert(table, "host", "fuga", 4);
-    hash_insert(table, "host", "okay", 4);
-    hash_insert(table, "referer", "https://google.com/", 4);
+    hash_insert(table, "host", "google.com", 5);
+    hash_insert(table, "host", "fuga", 5);
+    hash_insert(table, "host", "okay", 5);
+    hash_insert(table, "referer", "https://google.com/", 8);
 
-    entry = find_hash_entry(table, "host", 4);
+    entry = find_hash_entry(table, "host", 5);
     printf("value=%s\n", entry->value);
 
-    entry = find_hash_entry(table, "referer", 4);
+    entry = find_hash_entry(table, "referer", 8);
     printf("value=%s\n", entry->value);
 
-    entry = find_hash_entry(table, "foo", 3);
+    entry = find_hash_entry(table, "foo", 4);
     printf("value=%p\n", entry);
 
-    destroy_regions(r);
+    destroy_regions(table->r);
 
     return 0;
 };

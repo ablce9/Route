@@ -24,7 +24,10 @@ static void cleanup_bucket_size(void *p) {
     tmp += sizeof(region_t);
 
     bucket = ((rex_hash_entry_t *)tmp);
-    free(bucket->current_bucket_size);
+
+    if (bucket) {
+	free(bucket->current_bucket_size);
+    }
 }
 
 region_t *init_hash_table(region_t *r) {
@@ -55,18 +58,10 @@ region_t *init_hash_table(region_t *r) {
     return new_region;
 }
 
-#ifndef MAX_BUCKETS_SIZE
-#define MAX_BUCKETS_SIZE 255
-#endif
-
-#ifndef INITIAL_BUCKET_SIZE
-#define INITIAL_BUCKET_SIZE 255
-#endif
 rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, uint8_t key_size) {
-    void             *m;
     size_t           buckets_size, current_max_bucket_size, *current_bucket_size;
     uint8_t          hash;
-    region_t         *new_region;
+    region_t         *new_region, *bucket_r;
     rex_hash_entry_t *bucket, *head, *entry;
 
     hash = compute_hash_key(key, key_size);
@@ -74,19 +69,26 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
     hash = hash % buckets_size;
 
     bucket = table->buckets[hash];
-
     if (bucket) {
 	head = bucket;
 	current_bucket_size = bucket->current_bucket_size;
 	current_max_bucket_size = bucket->max_bucket_size;
 
 	*bucket->current_bucket_size += 1;
+
 	if (bucket->max_bucket_size < *bucket->current_bucket_size) {
-	    m = realloc((void *)bucket, sizeof(rex_hash_entry_t) * 255);
-	    bucket = (rex_hash_entry_t *)m;
+
+	    printf("[debug] Reallocating space for bucket entries\n");
+
+	    bucket->r = reallocate_region(bucket->r, bucket->r->size + BUCKET_ENTRY_SIZE);
+	    table->r = bucket->r;
+
+	    bucket->max_bucket_size += BUCKET_ENTRY_COUNT;
 	}
 
-	entry = ++bucket;
+	bucket_r = bucket->r;
+
+	entry = bucket + sizeof(rex_hash_entry_t);
 
 	entry->current_bucket_size = current_bucket_size;
 	entry->key = key;
@@ -94,21 +96,28 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
 	entry->next = NULL;
 	entry->prev = head;
 	entry->max_bucket_size = current_max_bucket_size;
+	entry->r = bucket_r;
+
     } else {
 	new_region = ralloc(table->r, sizeof(rex_hash_entry_t) * (size_t)INITIAL_BUCKET_SIZE);
+	if (!new_region) {
+	    return NULL;
+	}
+
 	new_region->cleanup = cleanup_bucket_size;
 
 	table->buckets[hash] = new_region->data;
-
 	table->buckets[hash]->current_bucket_size = malloc(sizeof(size_t));
-	*table->buckets[hash]->current_bucket_size = 0;
+	*table->buckets[hash]->current_bucket_size = 1;
 	table->buckets[hash]->max_bucket_size = (size_t)INITIAL_BUCKET_SIZE;
 
 	entry = table->buckets[hash];
 
 	entry->key = key;
 	entry->value = value;
+	entry->r = new_region;
 
+	table->buckets[hash]->r = new_region;
 	table->buckets[hash]->next = NULL;
 	table->buckets[hash]->prev = NULL;
 	table->r = new_region;

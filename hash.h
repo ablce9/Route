@@ -6,6 +6,22 @@
 #include "./buffer.h"
 #include "./region.h"
 
+#ifndef MAX_BUCKETS_SIZE
+#define MAX_BUCKETS_SIZE 255
+#endif
+
+#ifndef INITIAL_BUCKET_SIZE
+#define INITIAL_BUCKET_SIZE 255
+#endif
+
+#ifndef BUCKET_ENTRY_COUNT
+#define BUCKET_ENTRY_COUNT 255
+#endif
+
+#ifndef BUCKET_ENTRY_SIZE
+#define BUCKET_ENTRY_SIZE BUCKET_ENTRY_COUNT * sizeof(rex_hash_entry_t)
+#endif
+
 typedef struct rex_hash_entry_s rex_hash_entry_t;
 
 struct rex_hash_entry_s {
@@ -13,6 +29,7 @@ struct rex_hash_entry_s {
     char             *value;
     size_t           *current_bucket_size;
     size_t           max_bucket_size;
+    region_t         *r;
     rex_hash_entry_t *next;
     rex_hash_entry_t *prev;
 };
