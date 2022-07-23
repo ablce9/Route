@@ -88,7 +88,7 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
 
 	bucket_r = bucket->r;
 
-	entry = bucket + sizeof(rex_hash_entry_t);
+	entry = bucket + sizeof(rex_hash_entry_t *);
 
 	entry->current_bucket_size = current_bucket_size;
 	entry->key = key;
