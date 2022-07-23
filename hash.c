@@ -32,17 +32,17 @@ static void cleanup_bucket_size(void *p) {
 
 region_t *init_hash_table(region_t *r) {
     size_t           table_size;
-    region_t         *new_region;
+    region_t         *table_r;
     rex_hash_table_t *table;
 
-    new_region = ralloc(r, sizeof(rex_hash_table_t));
-    if (new_region == NULL) {
+    table_r = ralloc(r, sizeof(rex_hash_table_t));
+    if (table_r == NULL) {
 	return NULL;
     }
 
-    table = new_region->data;
+    table = table_r->data;
 
-    table->r = new_region;
+    table->r = table_r;
 
     table_size = 255;
 
@@ -52,10 +52,10 @@ region_t *init_hash_table(region_t *r) {
 	return NULL;
     }
 
-    new_region->cleanup = cleanup_buckets;
-    new_region->data = table;
+    table_r->cleanup = cleanup_buckets;
+    table_r->data = table;
 
-    return new_region;
+    return table_r;
 }
 
 rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, uint8_t key_size) {
