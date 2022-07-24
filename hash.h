@@ -6,10 +6,6 @@
 #include "./buffer.h"
 #include "./region.h"
 
-#ifndef MAX_BUCKETS_SIZE
-#define MAX_BUCKETS_SIZE 255
-#endif
-
 #ifndef INITIAL_BUCKET_SIZE
 #define INITIAL_BUCKET_SIZE 255
 #endif

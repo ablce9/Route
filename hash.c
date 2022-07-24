@@ -31,7 +31,7 @@ static void cleanup_bucket_size(void *p) {
 }
 
 region_t *init_hash_table(region_t *r) {
-    size_t           table_size;
+    size_t           buckets_size;
     region_t         *table_r;
     rex_hash_table_t *table;
 
@@ -44,9 +44,9 @@ region_t *init_hash_table(region_t *r) {
 
     table->r = table_r;
 
-    table_size = 255;
+    buckets_size = 255;
 
-    table->buckets = calloc(sizeof(rex_hash_entry_t *), table_size);
+    table->buckets = calloc(sizeof(rex_hash_entry_t *), buckets_size);
 
     if (table->buckets == NULL) {
 	return NULL;
@@ -59,17 +59,16 @@ region_t *init_hash_table(region_t *r) {
 }
 
 rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, uint8_t key_size) {
-    size_t           buckets_size, current_max_bucket_size, *current_bucket_size;
+    size_t           current_max_bucket_size, *current_bucket_size;
     uint8_t          hash;
-    region_t         *new_region, *bucket_r;
+    region_t         *bucket_r;
     rex_hash_entry_t *bucket, *head, *entry;
 
     hash = compute_hash_key(key, key_size);
-    buckets_size = MAX_BUCKETS_SIZE;
-    hash = hash % buckets_size;
+    hash = hash % INITIAL_BUCKET_SIZE;
 
     bucket = table->buckets[hash];
-    if (bucket) {
+    if (bucket != NULL) {
 	head = bucket;
 	current_bucket_size = bucket->current_bucket_size;
 	current_max_bucket_size = bucket->max_bucket_size;
@@ -77,9 +76,7 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
 	*bucket->current_bucket_size += 1;
 
 	if (bucket->max_bucket_size < *bucket->current_bucket_size) {
-
 	    printf("[debug] Reallocating space for bucket entries\n");
-
 	    bucket->r = reallocate_region(bucket->r, bucket->r->size + BUCKET_ENTRY_SIZE);
 	    table->r = bucket->r;
 
@@ -88,7 +85,7 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
 
 	bucket_r = bucket->r;
 
-	entry = bucket + sizeof(rex_hash_entry_t *);
+	entry = bucket + *bucket->current_bucket_size;
 
 	entry->current_bucket_size = current_bucket_size;
 	entry->key = key;
@@ -99,15 +96,19 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
 	entry->r = bucket_r;
 
     } else {
-	new_region = ralloc(table->r, sizeof(rex_hash_entry_t) * (size_t)INITIAL_BUCKET_SIZE);
-	if (!new_region) {
+	bucket_r = ralloc(table->r, sizeof(rex_hash_entry_t) * INITIAL_BUCKET_SIZE);
+	if (bucket_r == NULL) {
 	    return NULL;
 	}
 
-	new_region->cleanup = cleanup_bucket_size;
+	bucket_r->cleanup = cleanup_bucket_size;
 
-	table->buckets[hash] = new_region->data;
+	table->buckets[hash] = bucket_r->data;
 	table->buckets[hash]->current_bucket_size = malloc(sizeof(size_t));
+	if (table->buckets[hash]->current_bucket_size == NULL) {
+	    return NULL;
+	}
+
 	*table->buckets[hash]->current_bucket_size = 1;
 	table->buckets[hash]->max_bucket_size = (size_t)INITIAL_BUCKET_SIZE;
 
@@ -115,12 +116,12 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
 
 	entry->key = key;
 	entry->value = value;
-	entry->r = new_region;
+	entry->r = bucket_r;
 
-	table->buckets[hash]->r = new_region;
+	table->buckets[hash]->r = bucket_r;
 	table->buckets[hash]->next = NULL;
 	table->buckets[hash]->prev = NULL;
-	table->r = new_region;
+	table->r = bucket_r;
     }
 
     table->buckets[hash] = entry;
@@ -129,12 +130,11 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
 }
 
 rex_hash_entry_t *find_hash_entry(rex_hash_table_t *table, char *key, size_t key_size) {
-    uint8_t          hash, entry_size;
-    rex_hash_entry_t *bucket, *p;
+    uint8_t          hash;
+    rex_hash_entry_t *bucket, *entry;
 
     hash = compute_hash_key(key, key_size);
-    entry_size = 255;
-    hash = hash % entry_size;
+    hash = hash % INITIAL_BUCKET_SIZE;
 
     bucket = table->buckets[hash];
 
@@ -142,14 +142,14 @@ rex_hash_entry_t *find_hash_entry(rex_hash_table_t *table, char *key, size_t key
 	return NULL;
     }
 
-    p = bucket;
+    entry = bucket;
 
-    while ((p != NULL)) {
-	if (strncmp(p->key, key, key_size) == 0) {
-	    return p;
+    while ((entry != NULL)) {
+	if (strncmp(entry->key, key, key_size) == 0) {
+	    return entry;
 	}
 
-	p = p->prev;
+	entry = entry->prev;
     }
 
     return NULL;
