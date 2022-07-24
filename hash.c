@@ -31,7 +31,6 @@ static void cleanup_bucket_size(void *p) {
 }
 
 region_t *init_hash_table(region_t *r) {
-    size_t           buckets_size;
     region_t         *table_r;
     rex_hash_table_t *table;
 
@@ -44,9 +43,7 @@ region_t *init_hash_table(region_t *r) {
 
     table->r = table_r;
 
-    buckets_size = 255;
-
-    table->buckets = calloc(sizeof(rex_hash_entry_t *), buckets_size);
+    table->buckets = calloc(sizeof(rex_hash_entry_t *), INITIAL_BUCKET_SIZE);
 
     if (table->buckets == NULL) {
 	return NULL;
@@ -83,17 +80,14 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
 	    bucket->max_bucket_size += BUCKET_ENTRY_COUNT;
 	}
 
-	bucket_r = bucket->r;
-
 	entry = bucket + *bucket->current_bucket_size;
-
 	entry->current_bucket_size = current_bucket_size;
 	entry->key = key;
 	entry->value = value;
 	entry->next = NULL;
 	entry->prev = head;
 	entry->max_bucket_size = current_max_bucket_size;
-	entry->r = bucket_r;
+	entry->r = bucket->r;
 
     } else {
 	bucket_r = ralloc(table->r, sizeof(rex_hash_entry_t) * INITIAL_BUCKET_SIZE);
