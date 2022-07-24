@@ -27,16 +27,15 @@ static rex_hash_table_t *parse_http_request_meta_header_line(char *line_buf, siz
 	ch = *p;
 
 	if (ch == ':') {
-
-	    key_buf = split_chain_buffer(chain_buf, key_size);
 	    val_buf = split_chain_buffer(chain_buf, line_size - key_size);
 	    val_buf = line_buf + key_size + 2;
-
-	    hash_table = hash_insert(hash_table, key_buf, val_buf, line_size - key_size);
-
 	    break;
 	}
     }
+
+    key_buf = split_chain_buffer(chain_buf, key_size);
+    memcpy(key_buf, line_buf, key_size);
+    hash_table = hash_insert(hash_table, key_buf, val_buf, line_size - key_size);
 
     return hash_table;
 }
