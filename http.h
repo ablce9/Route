@@ -25,13 +25,13 @@
 
 typedef intptr_t rex_int;
 
-typedef struct {
+typedef struct http_header_s {
     char             *path;
     size_t           size;
     uint8_t          method;
     uint8_t          version;
-    rex_hash_table_t *meta;
-    region_t  *r;
+    region_t         *r;
+    rex_hash_table_t *__fields;
 } http_header_t;
 
 typedef struct {

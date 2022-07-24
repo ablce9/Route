@@ -381,7 +381,7 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 		memcpy(line_buf, line, line_length);
 
 		hash_table = parse_http_request_meta_header_line(line_buf, line_length, hash_table, chain_buf);
-		header->meta = hash_table;
+		header->__fields = hash_table;
 
 	    } else { /* TODO */ }
 
@@ -401,4 +401,23 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
  error:
     return REX_ERROR;
+}
+
+http_header_t *make_http_header_builder(region_t *r) {
+    http_header_t *header;
+
+    ralloc(r, sizeof(http_header_t));
+    header = r->data;
+    if (header == NULL) {
+	return NULL;
+    }
+
+    header->path = NULL;
+    header->size = 0;
+    header->method = 0;
+    header->version = 0;
+    header->r = r;
+    header->__fields = NULL;
+
+    return header;
 }
