@@ -41,8 +41,8 @@ void test_reallocate_region() {
     copy_10_reversed_order_digits_string(new_addr);
 
     // then data must be equal
-    assert(strncmp(old_addr, "0123456789", 10) == 0);
-    assert(strncmp(new_addr, "9876543210", 10) == 0);
+    assert(strncmp(old_addr, "0123456789", 11) == 0);
+    assert(strncmp(new_addr, "9876543210", 11) == 0);
 
     destroy_regions(r);
 }
