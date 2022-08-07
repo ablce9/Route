@@ -4,18 +4,6 @@
 #include "hash.h"
 #include "region.h"
 
-static void cleanup_buckets(void *p) {
-    void             *tmp;
-    rex_hash_entry_t **buckets;
-
-    tmp = p;
-    tmp += sizeof(region_t);
-
-    buckets = ((rex_hash_table_t *)tmp)->buckets;
-
-    free(buckets);
-}
-
 static void cleanup_bucket_size(void *p) {
     void             *tmp;
     rex_hash_entry_t *bucket;
@@ -28,6 +16,18 @@ static void cleanup_bucket_size(void *p) {
     if (bucket) {
 	free(bucket->current_bucket_size);
     }
+}
+
+static void cleanup_buckets(void *p) {
+    void             *tmp;
+    rex_hash_entry_t **buckets;
+
+    tmp = p;
+    tmp += sizeof(region_t);
+
+    buckets = ((rex_hash_table_t *)tmp)->buckets;
+
+    free(buckets);
 }
 
 region_t *init_hash_table(region_t *r) {
@@ -56,41 +56,42 @@ region_t *init_hash_table(region_t *r) {
 }
 
 rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, uint8_t key_size) {
-    size_t           current_max_bucket_size, *current_bucket_size;
+    size_t           current_max_bucket_size;
     uint8_t          hash;
     region_t         *bucket_r;
     rex_hash_entry_t *bucket, *head, *entry;
 
-    hash = compute_hash_key(key, key_size);
-    hash = hash % INITIAL_BUCKET_SIZE;
+    hash = compute_hash_key(key, key_size) % INITIAL_BUCKET_SIZE;
 
     bucket = table->buckets[hash];
     if (bucket != NULL) {
 	head = bucket;
-	current_bucket_size = bucket->current_bucket_size;
 	current_max_bucket_size = bucket->max_bucket_size;
 
 	*bucket->current_bucket_size += 1;
 
 	if (bucket->max_bucket_size < *bucket->current_bucket_size) {
 	    printf("[debug] Reallocating space for bucket entries\n");
-	    bucket->r = reallocate_region(bucket->r, bucket->r->size + BUCKET_ENTRY_SIZE);
+	    bucket->r = reallocate_region(bucket->r, BUCKET_ENTRY_SIZE);
 	    table->r = bucket->r;
 
-	    bucket->max_bucket_size += BUCKET_ENTRY_COUNT;
+	    entry = bucket->r->data;
+	    entry->max_bucket_size += INITIAL_BUCKET_SIZE;
+	} else {
+	    entry = bucket + 1;
 	}
 
-	entry = bucket + *bucket->current_bucket_size;
-	entry->current_bucket_size = current_bucket_size;
+	entry->current_bucket_size = bucket->current_bucket_size;
 	entry->key = key;
 	entry->value = value;
 	entry->next = NULL;
+
 	entry->prev = head;
 	entry->max_bucket_size = current_max_bucket_size;
 	entry->r = bucket->r;
 
     } else {
-	bucket_r = ralloc(table->r, sizeof(rex_hash_entry_t) * INITIAL_BUCKET_SIZE);
+	bucket_r = ralloc(table->r, BUCKET_ENTRY_SIZE);
 	if (bucket_r == NULL) {
 	    return NULL;
 	}
@@ -111,6 +112,7 @@ rex_hash_table_t *hash_insert(rex_hash_table_t *table, char *key, char *value, u
 	entry->key = key;
 	entry->value = value;
 	entry->r = bucket_r;
+	entry->current_bucket_size = table->buckets[hash]->current_bucket_size;
 
 	table->buckets[hash]->r = bucket_r;
 	table->buckets[hash]->next = NULL;
@@ -127,9 +129,7 @@ rex_hash_entry_t *find_hash_entry(rex_hash_table_t *table, char *key, size_t key
     uint8_t          hash;
     rex_hash_entry_t *bucket, *entry;
 
-    hash = compute_hash_key(key, key_size);
-    hash = hash % INITIAL_BUCKET_SIZE;
-
+    hash = compute_hash_key(key, key_size) % INITIAL_BUCKET_SIZE;
     bucket = table->buckets[hash];
 
     if (bucket == NULL) {
@@ -142,7 +142,6 @@ rex_hash_entry_t *find_hash_entry(rex_hash_table_t *table, char *key, size_t key
 	if (strncmp(entry->key, key, key_size) == 0) {
 	    return entry;
 	}
-
 	entry = entry->prev;
     }
 
