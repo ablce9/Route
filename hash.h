@@ -10,12 +10,8 @@
 #define INITIAL_BUCKET_SIZE 255
 #endif
 
-#ifndef BUCKET_ENTRY_COUNT
-#define BUCKET_ENTRY_COUNT 255
-#endif
-
 #ifndef BUCKET_ENTRY_SIZE
-#define BUCKET_ENTRY_SIZE BUCKET_ENTRY_COUNT * sizeof(rex_hash_entry_t)
+#define BUCKET_ENTRY_SIZE INITIAL_BUCKET_SIZE * sizeof(rex_hash_entry_t)
 #endif
 
 typedef struct rex_hash_entry_s rex_hash_entry_t;
