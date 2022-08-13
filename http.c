@@ -310,9 +310,8 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
     } state;
 
     char line[MAX_HTTP_HEADER_LINE_BUFFER_SIZE], ch, *p;
-    int line_length = 0, hash_index = 0;
+    int line_length = 0;
     rex_int parsed_status;
-    rex_hash_entry_t *hash_entry;
 
     state = start;
 
