@@ -9,10 +9,10 @@ rex: $(OBJS)
 test_buffer: test_buffer.o $(TEST_OBJS)
 	$(CC) -o $@ test_buffer.o $(TEST_OBJS) $(CFLAGS)
 
-test_http: test_http.o
+test_http: test_http.o $(TEST_OBJS)
 	$(CC) -o $@ http.o buffer.o hash.o region.o test_http.o $(CFLAGS)
 
-test_region: test_region.o $(OBJS)
+test_region: test_region.o $(TEST_OBJS)
 	$(CC) -o $@ $(TEST_OBJS) test_region.o $(CFLAGS)
 
 test_hash: test_hash.o buffer.o hash.o region.o
