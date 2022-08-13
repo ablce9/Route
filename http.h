@@ -45,10 +45,12 @@ typedef struct {
     // todo: add body
 } http_request_parse_result_t;
 
-rex_int parse_http_request(http_header_t *header, __buffer_t *header_buf, __buffer_t *chain_buf, rex_hash_table_t *hash_table);
+rex_int parse_http_request(http_header_t *header, __buffer_t *header_buf, __buffer_t *chain_buf);
 http_header_t *new_http_request_header(region_t *r);
 http_request_parse_result_t *create_http_request_parse_result(region_t *r);
 char *create_http_response_header(http_header_t *h, char *chain_buf);
 char *create_http_request_header_string(http_header_t *h, char *dst_buf);
+region_t *init_http_header(region_t *r);
+rex_hash_entry_t *fetch_header_field(char *key, size_t key_len, http_header_t *header);
 
 #endif //  __HTTP_H

@@ -302,7 +302,7 @@ static rex_int parse_http_request_start(http_header_t *header, const char *line_
 #define CR '\r'
 
 rex_int
-parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_buf, rex_hash_table_t *hash_table) {
+parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_buf) {
     enum {
 	start = 0,
 	almost_done,
@@ -372,14 +372,10 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
 	case LF:
 	    if (state == almost_done && line_length <= MAX_HTTP_HEADER_LINE_BUFFER_SIZE && line_length > 0) {
-
 		char *line_buf;
 
 		line_buf = split_chain_buffer(chain_buf, line_length);
-
 		memcpy(line_buf, line, line_length);
-
-		header->__fields = hash_table;
 		parse_http_request_meta_header_line(line_buf, line_length, header, chain_buf);
 
 	    } else { /* TODO */ }
@@ -402,21 +398,39 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
     return REX_ERROR;
 }
 
-http_header_t *make_http_header_builder(region_t *r) {
-    http_header_t *header;
+rex_hash_entry_t *fetch_header_field(char *key, size_t key_len, http_header_t *header) {
+    rex_hash_entry_t *entry;
 
-    ralloc(r, sizeof(http_header_t));
-    header = r->data;
-    if (header == NULL) {
+    entry = find_hash_entry(header->__fields, key, key_len);
+    if (entry == NULL) {
 	return NULL;
     }
 
+    return entry;
+}
+
+region_t *init_http_header(region_t *r) {
+    http_header_t *header;
+    rex_hash_table_t *hash_table;
+
+    r = init_hash_table(r);
+    if (r == NULL) {
+	return NULL;
+    }
+    hash_table = r->data;
+
+    r = ralloc(r, sizeof(http_header_t));
+    if (r == NULL) {
+	return NULL;
+    }
+
+    header = r->data;
     header->path = NULL;
     header->size = 0;
     header->method = 0;
     header->version = 0;
     header->r = r;
-    header->__fields = NULL;
+    header->__fields = hash_table;
 
-    return header;
+    return r;
 }
