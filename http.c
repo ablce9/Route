@@ -18,7 +18,7 @@ static http_header_t *init_http_request_header(region_t *r);
 const char *weeks[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-static rex_hash_table_t *parse_http_request_meta_header_line(char *line_buf, size_t line_size, rex_hash_table_t *hash_table, __buffer_t *chain_buf) {
+static rex_hash_table_t *parse_http_request_meta_header_line(char *line_buf, size_t line_size, http_header_t *header, __buffer_t *chain_buf) {
     char ch, *p, *key_buf, *val_buf;
     size_t key_size = 0;
 
@@ -35,9 +35,9 @@ static rex_hash_table_t *parse_http_request_meta_header_line(char *line_buf, siz
 
     key_buf = split_chain_buffer(chain_buf, key_size);
     memcpy(key_buf, line_buf, key_size);
-    hash_table = hash_insert(hash_table, key_buf, val_buf, line_size - key_size);
+    header->__fields = hash_insert(header->__fields, key_buf, val_buf, line_size - key_size);
 
-    return hash_table;
+    return header->__fields;
 }
 
 static void format_string(char *string, size_t size, char *fmt, ...)
@@ -380,8 +380,8 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
 		memcpy(line_buf, line, line_length);
 
-		hash_table = parse_http_request_meta_header_line(line_buf, line_length, hash_table, chain_buf);
 		header->__fields = hash_table;
+		parse_http_request_meta_header_line(line_buf, line_length, header, chain_buf);
 
 	    } else { /* TODO */ }
 
