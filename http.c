@@ -35,7 +35,7 @@ static rex_hash_table_t *parse_http_request_meta_header_line(char *line_buf, siz
 
     key_buf = split_chain_buffer(chain_buf, key_size);
     memcpy(key_buf, line_buf, key_size);
-    header->__fields = hash_insert(header->__fields, key_buf, val_buf, line_size - key_size);
+    header->__fields = hash_insert(header->__fields, key_buf, val_buf, key_size);
 
     return header->__fields;
 }
