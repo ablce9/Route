@@ -8,7 +8,7 @@
 #include "hash.h"
 #include "region.h"
 
-int main() {
+void insert_and_find_entry() {
     region_t       *r;
     rex_hash_table_t *table;
     rex_hash_entry_t *entry;
@@ -33,6 +33,24 @@ int main() {
     printf("value=%p\n", entry);
 
     destroy_regions(table->r);
-
-    return 0;
 };
+
+void find_entry_from_empty_table() {
+    region_t       *r;
+    rex_hash_table_t *table;
+
+    r = create_region();
+    r = init_hash_table(r);
+
+    table = (rex_hash_table_t *)r->data;
+
+    hash_insert(table, "host", "google.com", 5);
+    // find_hash_entry(table, "host", 5);
+    destroy_regions(table->r);
+    printf("done\n");
+}
+
+int main() {
+    insert_and_find_entry();
+    find_entry_from_empty_table();
+}
