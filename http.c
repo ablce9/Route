@@ -357,6 +357,7 @@ parse_http_request(http_header_t *header, __buffer_t *reqb, __buffer_t *chain_bu
 
 		line_buf = split_chain_buffer(chain_buf, line_length);
 		memcpy(line_buf, line, line_length);
+		line_buf[line_length] = '\0';
 		parse_http_request_meta_header_line(line_buf, line_length, header, chain_buf);
 
 	    } else { /* TODO */ }
