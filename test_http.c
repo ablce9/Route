@@ -20,7 +20,7 @@ static int test_parse_http_request() {
     region_t *r;
 
     r = create_region();
-    r = (region_t *)create_chain_buffer(r, sizeof(char *) * strlen(raw_header));
+    r = (region_t *)create_chain_buffer(r, strlen(raw_header));
 
     chain_buf = (__buffer_t *)r;
 
@@ -34,6 +34,9 @@ static int test_parse_http_request() {
 
     assert(result == REX_OK);
     assert(header->method == HTTP_REQUEST_METHOD_GET);
+
+    assert(strcmp(header->path, "/") == 0);
+
     assert(strcmp(fetch_header_field("Host", 4, header)->value, "google.com") == 0);
     assert(strcmp(fetch_header_field("User-Agent", 10, header)->value, "curl/7.74.0") == 0);
     assert(strcmp(fetch_header_field("Accept", 6, header)->value, "*/*") == 0);
