@@ -13,7 +13,6 @@
 #define CRLF "\r\n"
 
 static void format_string(char *string, size_t size, char *fmt, ...);
-static http_header_t *init_http_request_header(region_t *r);
 
 const char *weeks[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
@@ -128,46 +127,28 @@ char *create_http_request_header_string(http_header_t *h, char *dst_buf) {
     return dst_buf;
 }
 
-static http_header_t *init_http_request_header(region_t *r) {
-    region_t      *new_region;
-    http_header_t *header;
-
-    new_region = ralloc(r, sizeof(http_header_t));
-    if (new_region == NULL) {
-	return NULL;
-    }
-
-    header = (http_header_t *)new_region->data;
-
-    header->r      = new_region;
-    header->method = 0;
-    header->path   = NULL;
-
-    return header;
-}
-
 http_request_parse_result_t *create_http_request_parse_result(region_t *r) {
-    region_t                    *new_region;
     http_header_t               *header;
     http_request_parse_result_t *request;
 
-    new_region = ralloc(r, sizeof(http_request_parse_result_t));
-    if (new_region == NULL) {
+    r = ralloc(r, sizeof(http_request_parse_result_t));
+    if (r == NULL) {
 	return NULL;
     }
 
-    request = (http_request_parse_result_t *)new_region->data;
+    request = (http_request_parse_result_t *)r->data;
     if (request == NULL) {
 	return NULL;
     }
 
-    header = init_http_request_header(new_region);
-    if (header == NULL) {
+    r = init_http_header(r);
+    if (r == NULL) {
 	return NULL;
     }
 
+    header = r->data;
     request->header = header;
-    request->r = header->r;
+    request->r = r;
 
     return request;
 }
