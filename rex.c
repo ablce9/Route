@@ -185,36 +185,36 @@ static void close_proxy_connection_cb(uv_handle_t* handle) {
     }
 }
 
-static size_t make_file_buffer(char *buf) {
-    size_t     file_size;
-    uv_fs_t    stat_req, open_req, read_req, close_req;
-    const char *filename;
-
-    filename = "index.html";
-
-    if (uv_fs_stat(NULL, &stat_req, filename, NULL) != 0) {
-	return -1;
-    }
-
-    file_size = ((uv_stat_t*)&stat_req.statbuf)->st_size;
-    char fbuf[file_size];
-    memset(fbuf, 0, file_size);
-
-    uv_buf_t read_file_data = {
-	.base = fbuf,
-	.len = file_size,
-    };
-
-    uv_fs_open(NULL, &open_req, filename, O_RDONLY, 0, NULL);
-    uv_fs_read(NULL, &read_req, open_req.result, &read_file_data, 1, 0, NULL);
-    uv_fs_close(NULL, &close_req, open_req.result, NULL);
-
-    fbuf[file_size] = '\0';
-
-    memcpy(buf, fbuf, file_size);
-
-    return file_size;
-}
+// static size_t make_file_buffer(char *buf) {
+//     size_t     file_size;
+//     uv_fs_t    stat_req, open_req, read_req, close_req;
+//     const char *filename;
+//
+//     filename = "index.html";
+//
+//     if (uv_fs_stat(NULL, &stat_req, filename, NULL) != 0) {
+//	return -1;
+//     }
+//
+//     file_size = ((uv_stat_t*)&stat_req.statbuf)->st_size;
+//     char fbuf[file_size];
+//     memset(fbuf, 0, file_size);
+//
+//     uv_buf_t read_file_data = {
+//	.base = fbuf,
+//	.len = file_size,
+//     };
+//
+//     uv_fs_open(NULL, &open_req, filename, O_RDONLY, 0, NULL);
+//     uv_fs_read(NULL, &read_req, open_req.result, &read_file_data, 1, 0, NULL);
+//     uv_fs_close(NULL, &close_req, open_req.result, NULL);
+//
+//     fbuf[file_size] = '\0';
+//
+//     memcpy(buf, fbuf, file_size);
+//
+//     return file_size;
+// }
 
 static void write_cb(uv_write_t *request, int status) {
     if (status < 0) {
@@ -223,14 +223,9 @@ static void write_cb(uv_write_t *request, int status) {
 }
 
 static void handle_request(uv_stream_t *handle, ssize_t nread, const uv_buf_t *request_buf) {
-    char                           *file_buf, header_buffer[4096];
-    size_t                         response_size;
     rex_int                        parsed_status;
     region_t                       *r;
     __buffer_t                     *chain_buf, reqb;
-    http_header_t                  header;
-    rex_hash_entry_t               *hash_entry;
-    rex_hash_table_t               *hash_table;
     request_context_t              *ctx;
     http_request_parse_result_t    *http_request_parse_result;
 
@@ -247,29 +242,13 @@ static void handle_request(uv_stream_t *handle, ssize_t nread, const uv_buf_t *r
 
     chain_buf = ctx->rb;
 
-    // response_size = make_file_buffer(chain_buf->pos);
-    // file_buf = split_chain_buffer(chain_buf, response_size);
-    //
-    // header.size = response_size;
-    //
-    // create_http_response_header(&header, header_buffer);
-
-    // response_vec[0].base = header_buffer;
-    // response_vec[0].len = strlen(header_buffer);
-    //
-    // response_vec[1].base = file_buf;
-    // response_vec[1].len = response_size;
-
-    r = init_hash_table(r);
-    hash_table = (rex_hash_table_t *)r->data;
-
     http_request_parse_result = (http_request_parse_result_t *)create_http_request_parse_result(r);
     r = http_request_parse_result->r;
 
     reqb.pos = request_buf->base;
     reqb.end = reqb.pos + (sizeof(char *) * nread);
 
-    parsed_status = parse_http_request(http_request_parse_result->header, &reqb, chain_buf, hash_table);
+    parsed_status = parse_http_request(http_request_parse_result->header, &reqb, chain_buf);
 
     if (parsed_status != REX_OK) {
 	goto error;
@@ -305,7 +284,7 @@ static void handle_request(uv_stream_t *handle, ssize_t nread, const uv_buf_t *r
     return;
 
  error:
-    printf("[debug] invalid requests. closing connection.\n");
+   printf("[debug] invalid requests. closing connection.\n");
     uv_close((uv_handle_t*)handle, close_proxy_connection_cb);
 }
 
@@ -329,35 +308,35 @@ static region_t *make_request_context(region_t *r) {
     return new_region;
 }
 
-static void proxy_request_handler(uv_stream_t* stream, ssize_t buffer_size, const uv_buf_t* request_buffer) {
-    int                 connection_status;
-    region_t            *r;
-    connection_t        c;
-    request_context_t   *ctx;
-    struct sockaddr_in  dest_address;
-
-    if (buffer_size < 0) {
-	printf("error occurred on proxy_request_handler\n");
-	uv_close((uv_handle_t*)stream, close_proxy_connection_cb);
-	return;
-    }
-
-    ctx = (request_context_t *)stream->data;
-    r = ctx->r;
-
-    ctx->rb->pos += sizeof(char *) * buffer_size;
-
-    r = init_connection(r, &c);
-
-    uv_ip4_addr("127.0.0.1", 8000, &dest_address);
-    connection_status = uv_tcp_connect(c.uv_con, c.uv_socket, (const struct sockaddr *)&dest_address, proxy_connection_handler);
-    if (connection_status < 0) {
-	printf("connection error: %s\n", uv_strerror(connection_status));
-    }
-
-    ctx->r = r;
-    stream->data = (void *)ctx;
-}
+// static void proxy_request_handler(uv_stream_t* stream, ssize_t buffer_size, const uv_buf_t* request_buffer) {
+//     int                 connection_status;
+//     region_t            *r;
+//     connection_t        c;
+//     request_context_t   *ctx;
+//     struct sockaddr_in  dest_address;
+//
+//     if (buffer_size < 0) {
+//	printf("error occurred on proxy_request_handler\n");
+//	uv_close((uv_handle_t*)stream, close_proxy_connection_cb);
+//	return;
+//     }
+//
+//     ctx = (request_context_t *)stream->data;
+//     r = ctx->r;
+//
+//     ctx->rb->pos += sizeof(char *) * buffer_size;
+//
+//     r = init_connection(r, &c);
+//
+//     uv_ip4_addr("127.0.0.1", 8000, &dest_address);
+//     connection_status = uv_tcp_connect(c.uv_con, c.uv_socket, (const struct sockaddr *)&dest_address, proxy_connection_handler);
+//     if (connection_status < 0) {
+//	printf("connection error: %s\n", uv_strerror(connection_status));
+//     }
+//
+//     ctx->r = r;
+//     stream->data = (void *)ctx;
+// }
 
 static void alloc_request_buffer_handler(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
     region_t          *r;

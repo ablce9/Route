@@ -27,7 +27,7 @@ static rex_hash_table_t *parse_http_request_meta_header_line(char *line_buf, siz
 	ch = *p;
 
 	if (ch == ':') {
-	    val_buf = split_chain_buffer(chain_buf, line_size - key_size);
+	    val_buf = split_chain_buffer(chain_buf, line_size);
 	    val_buf = line_buf + key_size + 2;
 	    break;
 	}
