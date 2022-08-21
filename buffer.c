@@ -38,15 +38,15 @@ region_t *create_chain_buffer(region_t *r, size_t size) {
     __buffer_t *buf;
 
     new_region = ralloc(r, sizeof(__buffer_t));
-    if (new_region == NULL) {
-	return NULL;
+    if (!new_region) {
+        return NULL;
     }
 
     buf = (__buffer_t *)new_region->data;
 
     buf->start = malloc(size);
-    if (buf->start == NULL) {
-	return NULL;
+    if (!buf->start) {
+        return NULL;
     }
 
     memset(buf->start, 0, size);
