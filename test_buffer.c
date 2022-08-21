@@ -56,16 +56,18 @@ int test_buffer() {
 void test_split_chain_buffer() {
     char *d1, *d2, *p1, *p2;
     region_t *r;
+    __buffer_t *buf;
 
     r = create_region();
     r = create_chain_buffer(r, 12);
+    buf = r->data;
 
     d1 = "12345";
-    p1 = split_chain_buffer(r->data, 5);
+    p1 = split_chain_buffer(buf, 5);
     p1 = d1;
 
     d2 = "54321";
-    p2 = split_chain_buffer(r->data, 5);
+    p2 = split_chain_buffer(buf, 5);
     p2 = d2;
 
     printf("p1=%s\n", p1);

@@ -70,7 +70,7 @@ char *split_chain_buffer(__buffer_t *src_buf, size_t size) {
     // Add for line terminator.
     size += 1;
 
-    if (remained_space_size < (long)size) {
+    if (remained_space_size <= (long)size) {
 	src_buf = realloc_chain_buffer(src_buf, size);
 	printf("[debug] No space left for buffer, allocating new space: %ld bytes\n", size);
     }
