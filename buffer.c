@@ -6,20 +6,20 @@
 #include "region.h"
 
 static __buffer_t *realloc_chain_buffer(__buffer_t *buf, size_t want) {
-    void   *new_space;
-    size_t new_space_size;
+    region_t   *new_region;
+    __buffer_t *new_buf;
 
-    new_space_size = want * sizeof(char *);
+    new_region = reallocate_region(buf->r, want);
 
-    new_space = realloc((void *)buf->start, new_space_size);
+    new_buf = new_region->data;
 
-    buf->start = (char *)new_space;
-    buf->pos   = buf->start;
-    buf->end   = buf->start + new_space_size;
+    new_buf->start = buf->start;
+    new_buf->pos   = buf->pos;
+    new_buf->end   = buf->pos + want;
+    new_buf->r = new_region;
+    new_buf->size += want;
 
-    buf->size += new_space_size;
-
-    return buf;
+    return new_buf;
 }
 
 static void cleanup(void *p) {
