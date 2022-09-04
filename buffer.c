@@ -62,7 +62,7 @@ region_t *create_chain_buffer(region_t *r, size_t size) {
     return new_region;
 }
 
-char *split_chain_buffer(__buffer_t *src_buf, size_t size) {
+__buffer_t *split_chain_buffer(__buffer_t *src_buf, size_t size) {
     size_t remained_space_size;
 
     remained_space_size = (src_buf->end - src_buf->pos);
@@ -70,13 +70,16 @@ char *split_chain_buffer(__buffer_t *src_buf, size_t size) {
     // Add for line terminator.
     size += 1;
 
+    printf("r=%ld\n", remained_space_size);
     if (remained_space_size <= size) {
-        printf("[debug] No space left for buffer, allocating new space: %ld bytes\n", size);
-        src_buf = realloc_chain_buffer(src_buf, size);
+	printf("[debug] No space left for buffer, allocating new space: %ld bytes\n", size);
+	region_t *r = create_chain_buffer(src_buf->r, size + src_buf->size);
+	src_buf = r->data;
+	src_buf->r = r;
     }
 
     src_buf->pos[size] = '\0';
     src_buf->pos += size;
 
-    return src_buf->pos;
+    return src_buf;
 }
