@@ -5,23 +5,6 @@
 #include "buffer.h"
 #include "region.h"
 
-static __buffer_t *realloc_chain_buffer(__buffer_t *buf, size_t want) {
-    region_t   *new_region;
-    __buffer_t *new_buf;
-
-    new_region = reallocate_region(buf->r, want);
-
-    new_buf = new_region->data;
-
-    new_buf->start = buf->start;
-    new_buf->pos   = buf->pos;
-    new_buf->end   = buf->pos + want;
-    new_buf->r = new_region;
-    new_buf->size += want;
-
-    return new_buf;
-}
-
 static void cleanup(void *p) {
     void       *tmp;
     __buffer_t *buf;
