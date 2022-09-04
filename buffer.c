@@ -54,7 +54,7 @@ __buffer_t *split_chain_buffer(__buffer_t *src_buf, size_t size) {
     size += 1;
 
     if (remained_space_size <= size) {
-	printf("[debug] No space left for buffer, allocating new space: %ld bits\n", size);
+	printf("[debug] No space left for buffer, allocating new space: %ld bytes\n", size);
 	region_t *r = create_chain_buffer(src_buf->r, size);
 	src_buf = r->data;
 	src_buf->r = r;
