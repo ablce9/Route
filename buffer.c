@@ -7,25 +7,25 @@
 
 static void cleanup(void *p) {
     void       *tmp;
-    __buffer_t *buf;
+    rex_string_buffer_t *buf;
 
     tmp = p;
 
     tmp += sizeof(region_t);
-    buf = (__buffer_t *)tmp;
+    buf = (rex_string_buffer_t *)tmp;
     free(buf->start);
 }
 
 region_t *create_chain_buffer(region_t *r, size_t size) {
     region_t   *new_region;
-    __buffer_t *buf;
+    rex_string_buffer_t *buf;
 
-    new_region = ralloc(r, sizeof(__buffer_t));
+    new_region = ralloc(r, sizeof(rex_string_buffer_t));
     if (!new_region) {
         return NULL;
     }
 
-    buf = (__buffer_t *)new_region->data;
+    buf = (rex_string_buffer_t *)new_region->data;
 
     buf->start = malloc(size);
     if (!buf->start) {
@@ -45,7 +45,7 @@ region_t *create_chain_buffer(region_t *r, size_t size) {
     return new_region;
 }
 
-__buffer_t *alloc_string_buffer(__buffer_t *src_buf, size_t size) {
+rex_string_buffer_t *alloc_string_buffer(rex_string_buffer_t *src_buf, size_t size) {
     size_t remained_space_size;
 
     remained_space_size = src_buf->size - (src_buf->end - src_buf->pos);

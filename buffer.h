@@ -11,7 +11,7 @@ typedef struct {
     char     *start;
     char     *end;
     region_t *r;
-} __buffer_t;
+} rex_string_buffer_t;
 
 #define BUFFER_CURRENT_SIZE(s, e, p) (s - ((e - p)/sizeof(char *)))
 
@@ -22,8 +22,8 @@ typedef struct {
     } while(0);
 
 region_t *create_chain_buffer(region_t *r, size_t size);
-__buffer_t *alloc_new_buffer(const char *buffer);
-__buffer_t *buffer_bytes_ncpy(const __buffer_t *src, const size_t size);
-__buffer_t *alloc_string_buffer(__buffer_t *src_buf, size_t size);
+rex_string_buffer_t *alloc_new_buffer(const char *buffer);
+rex_string_buffer_t *buffer_bytes_ncpy(const rex_string_buffer_t *src, const size_t size);
+rex_string_buffer_t *alloc_string_buffer(rex_string_buffer_t *src_buf, size_t size);
 
 #endif // __BUFFER_H
