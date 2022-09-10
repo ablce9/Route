@@ -45,7 +45,7 @@ region_t *create_chain_buffer(region_t *r, size_t size) {
     return new_region;
 }
 
-__buffer_t *split_chain_buffer(__buffer_t *src_buf, size_t size) {
+__buffer_t *alloc_string_buffer(__buffer_t *src_buf, size_t size) {
     size_t remained_space_size;
 
     remained_space_size = src_buf->size - (src_buf->end - src_buf->pos);
