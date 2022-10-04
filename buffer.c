@@ -25,7 +25,11 @@ static void cleanup_string_cylinder_space(void *p) {
 
     tmp += sizeof(region_t);
     cylinder = (rex_string_cylinder_t *)tmp;
-    free(cylinder->str_space_end - cylinder->str_space_size);
+
+    if (cylinder->str_space) {
+	free(cylinder->str_space); // _end - cylinder->str_space_size);
+	cylinder->str_space = NULL;
+    }
 }
 
 region_t *create_chain_buffer(region_t *r, size_t size) {
@@ -81,19 +85,20 @@ rex_string_buffer_t *alloc_string_buffer(rex_string_buffer_t *buf, char *dst, ch
     return buf;
 }
 
-//rex_string_t *append_string(rex_string_cylinder_t *cylinder, char *src_str, size_t len) {
 static rex_string_cylinder_t *append_string(rex_string_cylinder_t *cylinder, char *src_str, size_t len) {
     rex_string_t *str;
     ssize_t remained_strs_size;
 
-    // remained_strs_size = cylinder->strs_end - cylinder->strs;
-    // if (cylinder->strs_count >= 1) {
-    cylinder->strs += 1;
-    // }
-    // if (remained_strs_size <= 0) {
-    //	// error
-    //	return NULL;
-    // }
+    remained_strs_size = cylinder->strs_end - cylinder->strs;
+    if (cylinder->strs_count >= 1) {
+	cylinder->strs += 1;
+	remained_strs_size -= 1;
+    }
+
+    if (remained_strs_size <= 0) {
+	// error
+	return NULL;
+    }
 
     str = cylinder->strs;
     str->len = len;
@@ -108,20 +113,25 @@ static rex_string_cylinder_t *append_string(rex_string_cylinder_t *cylinder, cha
     return cylinder;
 }
 
+#define LEAST_STR_SPACE_BYTES 127
 rex_string_cylinder_t *init_string_cylinder(rex_string_cylinder_t *cylinder, size_t strings_count, size_t space_size) {
     region_t *r;
     rex_string_t *strs;
 
-    r = cylinder->r;
-    r->cleanup = cleanup_string_cylinder_space;
+    if (space_size <= LEAST_STR_SPACE_BYTES) {
+	printf("error: str_space must be larger than 127\n");
+	return NULL;
+    }
 
     // TODO: Use calloc over malloc. Avoid memset.
-    r = ralloc(r, sizeof(rex_string_t) * strings_count);
+    r = ralloc(cylinder->r, sizeof(rex_string_t) * strings_count);
     memset(r->data, 0, sizeof(rex_string_t) * strings_count);
     strs = r->data;
 
+    r = ralloc(r, sizeof(char *) * space_size);
     cylinder->r = r;
-    cylinder->str_space = malloc(sizeof(char *) * space_size);
+    cylinder->str_space = r->data;
+
     if (!cylinder->str_space) {
 	return NULL;
     }
@@ -136,16 +146,40 @@ rex_string_cylinder_t *init_string_cylinder(rex_string_cylinder_t *cylinder, siz
     return cylinder;
 }
 
+static rex_string_cylinder_t *reinit_string_cylinder(rex_string_cylinder_t *cylinder, size_t strings_count, size_t space_size) {
+    region_t *r;
+    rex_string_t *strs;
+
+    // TODO: Use calloc over malloc. Avoid memset.
+    r = ralloc(cylinder->r, sizeof(rex_string_t) * strings_count);
+    memset(r->data, 0, sizeof(rex_string_t) * strings_count);
+    strs = r->data;
+
+    cylinder->r = r;
+    //cylinder->r->cleanup = cleanup_string_cylinder_space;
+    //cylinder->str_space = malloc(sizeof(char *) * space_size);
+    //if (!cylinder->str_space) {
+    //	return NULL;
+    //}
+
+    //cylinder->str_space_size = space_size;
+    //cylinder->str_space_end = cylinder->str_space + space_size;
+    cylinder->strs = strs;
+    cylinder->strs_max_size = strings_count;
+    cylinder->strs_end = strs + strings_count;
+    cylinder->strs_count = 0;
+
+    return cylinder;
+}
+
 rex_string_cylinder_t *alloc_string(rex_string_cylinder_t *cylinder, char *src_str, size_t len) {
     ssize_t remained_strs_size, remained_space;
 
     remained_strs_size = cylinder->strs_end - cylinder->strs;
 
     if (remained_strs_size <= 1) {
-	init_string_cylinder(cylinder, cylinder->strs_max_size, cylinder->str_space_size);
+	reinit_string_cylinder(cylinder, cylinder->strs_max_size, cylinder->str_space_size);
     }
-
-    append_string(cylinder, src_str, len);
 
     remained_space = cylinder->str_space_end - cylinder->str_space;
     if (remained_space <= 0) {
@@ -159,6 +193,8 @@ rex_string_cylinder_t *alloc_string(rex_string_cylinder_t *cylinder, char *src_s
 	cylinder->str_space_end = cylinder->str_space + cylinder->str_space_size;
 	cylinder->r = r;
     }
+
+    append_string(cylinder, src_str, len);
 
     return cylinder;
 }
