@@ -93,6 +93,22 @@ void test_alloc_string() {
 
 	destroy_regions(cylinder->r);
     }
+
+    { // when space_size is less than 128
+	rex_string_cylinder_t *cylinder;
+	region_t *r;
+
+	size_t alloced_str_space_byte = 127;
+
+	r = init_region();
+	r = ralloc(r, sizeof(rex_string_cylinder_t));
+	cylinder = r->data;
+	cylinder->r = r;
+
+	// returns null
+	assert(init_string_cylinder(cylinder, 1, alloced_str_space_byte) == NULL);
+	destroy_regions(cylinder->r);
+    }
 }
 
 int main() {
