@@ -123,7 +123,6 @@ rex_string_cylinder_t *init_string_cylinder(rex_string_cylinder_t *cylinder, siz
 	return NULL;
     }
 
-    // TODO: Use calloc over malloc. Avoid memset.
     r = ralloc(cylinder->r, sizeof(rex_string_t) * strings_count);
     memset(r->data, 0, sizeof(rex_string_t) * strings_count);
     strs = r->data;
@@ -146,24 +145,15 @@ rex_string_cylinder_t *init_string_cylinder(rex_string_cylinder_t *cylinder, siz
     return cylinder;
 }
 
-static rex_string_cylinder_t *reinit_string_cylinder(rex_string_cylinder_t *cylinder, size_t strings_count, size_t space_size) {
+static rex_string_cylinder_t *refresh_string_cylinder(rex_string_cylinder_t *cylinder, size_t strings_count) {
     region_t *r;
     rex_string_t *strs;
 
-    // TODO: Use calloc over malloc. Avoid memset.
     r = ralloc(cylinder->r, sizeof(rex_string_t) * strings_count);
     memset(r->data, 0, sizeof(rex_string_t) * strings_count);
     strs = r->data;
 
     cylinder->r = r;
-    //cylinder->r->cleanup = cleanup_string_cylinder_space;
-    //cylinder->str_space = malloc(sizeof(char *) * space_size);
-    //if (!cylinder->str_space) {
-    //	return NULL;
-    //}
-
-    //cylinder->str_space_size = space_size;
-    //cylinder->str_space_end = cylinder->str_space + space_size;
     cylinder->strs = strs;
     cylinder->strs_max_size = strings_count;
     cylinder->strs_end = strs + strings_count;
@@ -178,10 +168,11 @@ rex_string_cylinder_t *alloc_string(rex_string_cylinder_t *cylinder, char *src_s
     remained_strs_size = cylinder->strs_end - cylinder->strs;
 
     if (remained_strs_size <= 1) {
-	reinit_string_cylinder(cylinder, cylinder->strs_max_size, cylinder->str_space_size);
+	refresh_string_cylinder(cylinder, cylinder->strs_max_size);
     }
 
     remained_space = cylinder->str_space_end - cylinder->str_space;
+
     if (remained_space <= 0) {
 	region_t *r = ralloc(cylinder->r, (sizeof(char *)* cylinder->str_space_size) + labs(remained_space));
 	r->cleanup = cleanup_string_cylinder_space;
