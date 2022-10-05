@@ -6,85 +6,6 @@
 #include "buffer.h"
 #include "region.h"
 
-static void cleanup(void *p) {
-    void       *tmp;
-    rex_string_buffer_t *buf;
-
-    tmp = p;
-
-    tmp += sizeof(region_t);
-    buf = (rex_string_buffer_t *)tmp;
-    free(buf->start);
-}
-
-static void cleanup_string_cylinder_space(void *p) {
-    void                  *tmp;
-    rex_string_cylinder_t *cylinder;
-
-    tmp = p;
-
-    tmp += sizeof(region_t);
-    cylinder = (rex_string_cylinder_t *)tmp;
-
-    if (cylinder->str_space) {
-	free(cylinder->str_space); // _end - cylinder->str_space_size);
-	cylinder->str_space = NULL;
-    }
-}
-
-region_t *create_chain_buffer(region_t *r, size_t size) {
-    region_t   *new_region;
-    rex_string_buffer_t *buf;
-
-    new_region = ralloc(r, sizeof(rex_string_buffer_t));
-    if (!new_region) {
-	return NULL;
-    }
-
-    buf = (rex_string_buffer_t *)new_region->data;
-
-    buf->start = malloc(size);
-    if (!buf->start) {
-	return NULL;
-    }
-
-    memset(buf->start, 0, size);
-
-    buf->r          = new_region;
-    buf->r->cleanup = cleanup;
-    buf->pos        = buf->start;
-    buf->end        = buf->start + size;
-    buf->size       = size;
-
-    new_region->data = buf;
-
-    return new_region;
-}
-
-rex_string_buffer_t *alloc_string_buffer(rex_string_buffer_t *buf, char *dst, char *src, size_t size) {
-    size_t remained_space_size;
-
-    remained_space_size = buf->end - buf->pos;
-
-    // Add for line terminator.
-    size += 1;
-
-    if (remained_space_size <= size) {
-	printf("[debug] No space left for buffer, allocating new space: %ld bytes\n", size);
-	region_t *r = create_chain_buffer(buf->r, size);
-	buf = r->data;
-	memcpy(dst, src, size);
-	buf->r = r;
-    } else {
-	memcpy(dst, src, size);
-    }
-
-    buf->pos[size] = '\0';
-    buf->pos += size;
-
-    return buf;
-}
-
 static rex_string_cylinder_t *append_string(rex_string_cylinder_t *cylinder, char *src_str, size_t len) {
     rex_string_t *str;
     ssize_t remained_strs_size;
@@ -175,7 +96,6 @@ rex_string_cylinder_t *alloc_string(rex_string_cylinder_t *cylinder, char *src_s
 
     if (remained_space <= 0) {
 	region_t *r = ralloc(cylinder->r, (sizeof(char *)* cylinder->str_space_size) + labs(remained_space));
-	r->cleanup = cleanup_string_cylinder_space;
 	cylinder->str_space = r->data;
 
 	if (!cylinder->str_space) {
