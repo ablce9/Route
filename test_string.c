@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <time.h>
 
-#include "buffer.h"
+#include "string.h"
 #include "region.h"
 
 static char *generate_entropy(char *buf, int max) {

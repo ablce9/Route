@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "buffer.h"
+#include "string.h"
 #include "region.h"
 
 static rex_string_cylinder_t *append_string(rex_string_cylinder_t *cylinder, char *src_str, size_t len) {

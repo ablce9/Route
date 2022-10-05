@@ -1,5 +1,5 @@
-#ifndef __BUFFER_H
-#define __BUFFER_H
+#ifndef __STRING_H
+#define __STRING_H
 
 #include <stdio.h>
 #include "region.h"
@@ -24,4 +24,4 @@ typedef struct rex_string_cylinder_s {
 
 rex_string_cylinder_t *init_string_cylinder(rex_string_cylinder_t *cylinder, size_t string_count, size_t space_size);
 rex_string_cylinder_t *alloc_string(rex_string_cylinder_t *cylinder, char *src_str, size_t len);
-#endif // __BUFFER_H
+#endif // __STRING_H
