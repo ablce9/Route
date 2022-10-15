@@ -23,10 +23,10 @@ static char *generate_entropy(char *buf, int max) {
 void test_alloc_string() {
     { // when strs is out of space
 	rex_string_cylinder_t *cylinder;
-	rex_string_t *str1, *str2, *str3;
+	const rex_string_t *str1, *str2, *str3;
 	region_t *r;
 
-	size_t alloced_strs_num = 1;
+	size_t alloced_strs_num = 3;
 
 	r = init_region();
 
@@ -37,21 +37,12 @@ void test_alloc_string() {
 	init_string_cylinder(cylinder, alloced_strs_num, 128);
 
 	str1 = alloc_string(cylinder, "test", 4)->strs;
-	// strs head stays still
-	assert(cylinder->strs == str1);
-	// str_space gets alloc-ed
-	assert(cylinder->str_space_end - cylinder->str_space == 124);
-
 	str2 = alloc_string(cylinder, "foo", 3)->strs;
-	// strs is alloc-ed again
-	assert(str1 != str2);
-	// str_space gets alloc-ed
-	assert(cylinder->str_space_end - cylinder->str_space == 121);
-
 	str3 = alloc_string(cylinder, "bar", 3)->strs;
-	// strs is alloc-ed again
-	assert(str2 != str3);
-	// str_space gets alloc-ed
+
+	assert(strcmp(str1->string, "test") == 0);
+	assert(strcmp(str2->string, "foo") == 0);
+	assert(strcmp(str3->string, "bar") == 0);
 	assert(cylinder->str_space_end - cylinder->str_space == 118);
 
 	destroy_regions(cylinder->r);

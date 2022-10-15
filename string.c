@@ -7,12 +7,19 @@
 #include "region.h"
 
 #define LEAST_STR_SPACE_BYTES 127
+#define LEAST_STRINGS_COUNT 1
+
 rex_string_cylinder_t *init_string_cylinder(rex_string_cylinder_t *cylinder, size_t strings_count, size_t space_size) {
     region_t *r;
     rex_string_t *strs;
 
     if (space_size <= LEAST_STR_SPACE_BYTES) {
 	printf("error: str_space must be larger than 127\n");
+	return NULL;
+    }
+
+    if (strings_count <= LEAST_STRINGS_COUNT) {
+	printf("error: strings_count must be larger than 1\n");
 	return NULL;
     }
 
@@ -31,8 +38,8 @@ rex_string_cylinder_t *init_string_cylinder(rex_string_cylinder_t *cylinder, siz
     cylinder->str_space_size = space_size;
     cylinder->str_space_end = cylinder->str_space + space_size;
     cylinder->strs = strs;
-    cylinder->strs_max_size = strings_count;
     cylinder->strs_end = strs + strings_count;
+    cylinder->strs_max_size = strings_count;
     cylinder->strs_count = 0;
 
     return cylinder;
@@ -50,12 +57,13 @@ static rex_string_cylinder_t *refresh_string_cylinder(rex_string_cylinder_t *cyl
     cylinder->strs = strs;
     cylinder->strs_max_size = strings_count;
     cylinder->strs_end = strs + strings_count;
+
     cylinder->strs_count = 0;
 
     return cylinder;
 }
 
-static rex_string_cylinder_t *append_string(rex_string_cylinder_t *cylinder, char *src_str, size_t len) {
+static rex_string_cylinder_t *copy_string(rex_string_cylinder_t *cylinder, char *src_str, size_t len) {
     rex_string_t *str;
     ssize_t remained_strs_size;
 
@@ -73,16 +81,11 @@ static rex_string_cylinder_t *append_string(rex_string_cylinder_t *cylinder, cha
     str = cylinder->strs;
     str->len = len;
     str->string = cylinder->str_space;
-    //str->string = src_str;
-    if (src_str) {
-	memcpy(str->string, src_str, len);
-    } else {
-	str->string = src_str;
-    }
+
+    str->string = src_str;
     str->end = str->string + len;
 
     cylinder->strs = str;
-    cylinder->str_space = str->string;
     cylinder->str_space += len;
     cylinder->strs_count += 1;
 
@@ -94,7 +97,7 @@ rex_string_cylinder_t *alloc_string(rex_string_cylinder_t *cylinder, char *src_s
 
     remained_strs_size = cylinder->strs_end - cylinder->strs;
 
-    if (remained_strs_size <= 1) {
+    if (remained_strs_size <= 0) {
 	refresh_string_cylinder(cylinder, cylinder->strs_max_size);
     }
 
@@ -111,7 +114,7 @@ rex_string_cylinder_t *alloc_string(rex_string_cylinder_t *cylinder, char *src_s
 	cylinder->r = r;
     }
 
-    append_string(cylinder, src_str, len);
+    copy_string(cylinder, src_str, len);
 
     return cylinder;
 }
